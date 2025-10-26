@@ -27,9 +27,20 @@ cycle() {
 
 # Send HTTP request — fetch <path> [method]
 fetch() {
-  local opts=(-X "${2:-GET}")
-  [[ -t 1 ]] && opts+=(-o /dev/null)
-  curl "${opts[@]}" --http1.1 --tcp-nodelay --keepalive -fsS -m2 --no-buffer "$BASE/$1"
+  local msg opts=(-X "${2:-GET}") rc=0
+  [[ -t 1 ]] && opts+=(-o /dev/null) || opts+=(-s)
+  curl "${opts[@]}" --http1.1 --tcp-nodelay --keepalive -fS -m2 --no-buffer "$BASE/$1" 2>/dev/null || rc=$?
+
+  case $rc in
+  0) ;;
+  7) msg='Cannot connect to Mu-so.' ;;
+  22) msg='Mu-so is in standby.' ;;
+  28) msg='Operation timed out.' ;;
+  *) msg="curl error ($rc)" ;;
+  esac
+
+  [[ -t 1 && $rc -gt 0 ]] && echo "$msg" >&2
+  return $rc
 }
 
 # Fetch JSON and filter with jq — fjson <endpoint> <jq_filter>
@@ -45,7 +56,7 @@ power() {
 # Print help text — usage
 usage() {
   local name=${0##*/}
-  printf '%s v2.1 - Control Naim Mu-so over HTTP\nCopyright © 2025 Stouthart. All rights reserved.\n\n' "$name"
+  printf '%s v2.3 - Control Naim Mu-so over HTTP\nCopyright © 2025 Stouthart. All rights reserved.\n\n' "$name"
   printf 'Usage: %s <option> [argument]\n\n' "$name"
   printf 'Power:\n  standby | wake\n\n'
   printf 'Playback:\n  next | pause | play | playpause | prev | stop\n  shuffle | repeat | mute | volume <0..100>\n\n'
@@ -117,7 +128,3 @@ help | -h | --help)
   exit 1
   ;;
 esac
-
-## https://community.naimaudio.com/t/turning-mu-so-on-and-off-with-apple-shortcuts/34262
-# sudo tcpdump -i en1 -s 0 -A -l host mu-so
-# Todo: 'to_entries[6:]' devices | favourites | inputs
