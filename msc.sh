@@ -39,7 +39,7 @@ fetch() {
   *) msg="curl error ($rc)" ;;
   esac
 
-  [[ -t 1 && $rc -gt 0 ]] && echo "$msg" >&2
+  [[ $rc -gt 0 && ! -t 1 ]] && echo "$msg" >&2
   return $rc
 }
 
