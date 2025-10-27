@@ -59,27 +59,24 @@ power() {
 # Help text — usage
 usage() {
   local name=${0##*/}
+
   printf '%s v2.5 - Control Naim Mu-so over HTTP\nCopyright © 2025 Stouthart. All rights reserved.\n\n' "$name"
   printf 'Usage: %s <option> [argument]\n\n' "$name"
   printf 'Power:\n  standby | wake\n\n'
   printf 'Inputs:\n  input | radio\n\n'
   printf 'Playback:\n  next | pause | play | playpause | prev | stop\n  shuffle | repeat\n\n'
   printf 'Audio:\n  loudness | mono | mute | volume <0..100>\n\n'
+  printf 'Other:\n  lighting\n\n'
   printf 'Status:\n  levels | network | nowplaying [key]\n  outputs | power | system | update\n'
 }
 
-# Option aliases
 opt=${1:-}
+
+# Option aliases
 case $opt in
-now)
-  opt=nowplaying
-  ;;
-pp)
-  opt=playpause
-  ;;
-vol)
-  opt=volume
-  ;;
+now) opt=nowplaying ;;
+pp) opt=playpause ;;
+vol) opt=volume ;;
 esac
 
 # Main option handler
@@ -119,6 +116,9 @@ volume)
     echo 'Missing or invalid argument.' >&2
     exit 1
   fi
+  ;;
+lighting)
+  cycle userinterface lightTheme 3
   ;;
 levels | network | nowplaying | outputs | power | system | update)
   if [[ ${2:-} =~ ^[[:alnum:]]+$ ]]; then
