@@ -22,24 +22,27 @@ choose() {
 
 # Toggle/cycle numeric field — cycle <endpoint> <field> [mod]
 cycle() {
-  fetch "$1?$2=$(fjson "$1" "(.$2|tonumber+1)%${3:-2}")" PUT
+  fetch "$1?$2=$(fjson "$1" "(.$2|tonumber+1)%${3:-2}")" PUT --silent
 }
 
 # Send HTTP request — fetch <path> [method]
 fetch() {
   local msg opts=(-X "${2:-GET}") rc=0
-  [[ -t 1 ]] && opts+=(-o /dev/null) || opts+=(-s)
-  curl "${opts[@]}" --http1.1 --tcp-nodelay --keepalive -fS -m2 --no-buffer "$BASE/$1" 2>/dev/null || rc=$?
+  [[ -t 1 ]] && opts+=(-o /dev/null)
+  curl "${opts[@]}" --http1.1 --tcp-nodelay --keepalive -fsS -m2 --no-buffer "$BASE/$1" 2>/dev/null || rc=$?
 
-  case $rc in
-  0) ;;
-  7) msg='Cannot connect to Mu-so.' ;;
-  22) msg='Mu-so is in standby.' ;;
-  28) msg='Operation timed out.' ;;
-  *) msg="curl error ($rc)" ;;
-  esac
+  [[ ${3:-} == --silent ]] || {
+    case $rc in
+    0) ;;
+    7) msg='Cannot connect to Mu-so.' ;;
+    22) msg='Mu-so is in standby.' ;;
+    28) msg='Operation timed out.' ;;
+    *) msg="curl error ($rc)" ;;
+    esac
 
-  [[ $rc -gt 0 && ! -t 1 ]] && echo "$msg" >&2
+    [[ $rc -gt 0 ]] && echo "$msg" >&2
+  }
+
   return $rc
 }
 
@@ -56,7 +59,7 @@ power() {
 # Print help text — usage
 usage() {
   local name=${0##*/}
-  printf '%s v2.3 - Control Naim Mu-so over HTTP\nCopyright © 2025 Stouthart. All rights reserved.\n\n' "$name"
+  printf '%s v2.4 - Control Naim Mu-so over HTTP\nCopyright © 2025 Stouthart. All rights reserved.\n\n' "$name"
   printf 'Usage: %s <option> [argument]\n\n' "$name"
   printf 'Power:\n  standby | wake\n\n'
   printf 'Playback:\n  next | pause | play | playpause | prev | stop\n  shuffle | repeat | mute | volume <0..100>\n\n'
