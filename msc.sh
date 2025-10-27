@@ -65,7 +65,7 @@ usage() {
   printf 'Inputs:\n  input | radio\n\n'
   printf 'Playback:\n  next | pause | play | playpause | prev | stop\n  shuffle | repeat\n\n'
   printf 'Audio:\n  loudness | mono | mute | volume <0..100>\n\n'
-  printf 'Status:\n  levels | multiroom | network | nowplaying\n  outputs | power | system | update\n'
+  printf 'Status:\n  levels | network | nowplaying | outputs\n  power | system | update\n'
 }
 
 # Option aliases
@@ -120,7 +120,7 @@ volume)
     exit 1
   fi
   ;;
-levels | multiroom | network | nowplaying | outputs | power | system | update)
+levels | network | nowplaying | outputs | power | system | update)
   if [[ ${2:-} =~ ^[[:alnum:]]+$ ]]; then
     fjson "$opt" ".\"$2\"//empty"
   else
