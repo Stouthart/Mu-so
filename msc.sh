@@ -2,7 +2,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-BASE="http://${NAIM_HOST:-mu-so}:15081"
+BASE="http://${MUSO_HOST:-mu-so}:15081"
 
 # List, select, and play item — choose <endpoint> <jq_filter>
 choose() {
@@ -36,8 +36,9 @@ fetch() {
     7) err='Cannot connect to Mu-so.' ;;
     22) err='Mu-so is in standby.' ;;
     28) err='Operation timed out.' ;;
-    *) err="curl error ($rc)" ;;
+    *) err="curl error ($rc)." ;;
     esac
+
     echo "$err" >&2
   }
 
@@ -54,15 +55,16 @@ power() {
   fetch "power?system=$1" PUT
 }
 
-# Print help text — usage
+# Help text — usage
 usage() {
   local name=${0##*/}
-  printf '%s v2.4 - Control Naim Mu-so over HTTP\nCopyright © 2025 Stouthart. All rights reserved.\n\n' "$name"
+  printf '%s v2.5 - Control Naim Mu-so over HTTP\nCopyright © 2025 Stouthart. All rights reserved.\n\n' "$name"
   printf 'Usage: %s <option> [argument]\n\n' "$name"
   printf 'Power:\n  standby | wake\n\n'
-  printf 'Playback:\n  next | pause | play | playpause | prev | stop\n  shuffle | repeat | mute | volume <0..100>\n\n'
-  printf 'Inputs / Presets:\n  input | preset\n\n'
-  printf 'Information:\n  alarms | levels | multiroom | network\n  nowplaying | power | system | update\n'
+  printf 'Inputs:\n  input | radio\n\n'
+  printf 'Playback:\n  next | pause | play | playpause | prev | stop\n  shuffle | repeat\n\n'
+  printf 'Audio:\n  loudness | mono | mute | volume <0..100>\n\n'
+  printf 'Information:\n  levels | multiroom | network | nowplaying\n  outputs | power | system | update\n'
 }
 
 # Option aliases
@@ -87,6 +89,13 @@ standby)
 wake)
   power on
   ;;
+input)
+  choose inputs '.children[]|select(.disabled=="0")'
+  ;;
+radio)
+  choose favourites \
+    '.children|map(select(.favouriteClass|test("^object\\.stream\\.radio")))|sort_by(.presetID|tonumber)[]'
+  ;;
 next | pause | play | playpause | prev | stop)
   fetch "nowplaying?cmd=$opt"
   ;;
@@ -95,6 +104,9 @@ shuffle)
   ;;
 repeat)
   cycle nowplaying "$opt" 3
+  ;;
+loudness | mono)
+  cycle outputs "$opt"
   ;;
 mute)
   cycle levels "$opt"
@@ -107,14 +119,7 @@ volume)
     exit 1
   fi
   ;;
-input)
-  choose inputs '.children[]|select(.disabled=="0")'
-  ;;
-preset)
-  choose favourites \
-    '.children|map(select(.favouriteClass|test("^object\\.stream\\.radio")))|sort_by(.presetID|tonumber)[]'
-  ;;
-alarms | levels | multiroom | network | nowplaying | power | system | update)
+levels | multiroom | network | nowplaying | outputs | power | system | update)
   if [[ ${2:-} =~ ^[[:alnum:]]+$ ]]; then
     fjson "$opt" ".\"$2\"//empty"
   else
