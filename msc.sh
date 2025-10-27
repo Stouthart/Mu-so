@@ -124,7 +124,7 @@ levels | multiroom | network | nowplaying | outputs | power | system | update)
   if [[ ${2:-} =~ ^[[:alnum:]]+$ ]]; then
     fjson "$opt" ".\"$2\"//empty"
   else
-    fjson "$opt" 'to_entries[5:]|map(select(.key!="cpu" and .key!="children"))[]|"\(.key)=\(.value)"'
+    fjson "$opt" 'to_entries[5:][]|select(.key|IN("children","cpu")|not)|"\(.key)=\(.value)"'
   fi
   ;;
 help | -h | --help)
