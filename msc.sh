@@ -20,7 +20,7 @@ choose() {
   fetch "${urls[REPLY - 1]}?cmd=play"
 }
 
-# Toggle/cycle numeric field — cycle <endpoint> <field> [mod]
+# Toggle/cycle numeric field — cycle <endpoint> <key> [mod]
 cycle() {
   fetch "$1?$2=$(fjson "$1" "(.$2|tonumber+1)%${3:-2}")" PUT --silent
 }
@@ -30,7 +30,7 @@ fetch() {
   local err opts=(-X "${2:-GET}") rc=0
   [[ -t 1 ]] && opts+=(-o /dev/null)
 
-  curl "${opts[@]}" --http1.1 --tcp-nodelay --keepalive -fs -m2 --no-buffer "$BASE/$1" || rc=$?
+  curl "${opts[@]}" --http1.1 --tcp-nodelay --keepalive-time 30 -fs -m5 --no-buffer "$BASE/$1" || rc=$?
 
   [[ $rc -gt 0 && ${3:-} != --silent ]] && {
     case $rc in
@@ -48,7 +48,7 @@ fetch() {
 
 # Fetch JSON and filter with jq — fjson <endpoint> <jq_filter>
 fjson() {
-  jq -cr "$2" <(fetch "$1")
+  fetch "$1" | jq -cr "$2"
 }
 
 # Set power on/off — power <state>
