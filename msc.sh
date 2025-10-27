@@ -25,10 +25,11 @@ cycle() {
   fetch "$1?$2=$(fjson "$1" "(.$2|tonumber+1)%${3:-2}")" PUT --silent
 }
 
-# Send HTTP request — fetch <path> [method]
+# Send HTTP request — fetch <path> [method] [--silent]
 fetch() {
   local err opts=(-X "${2:-GET}") rc=0
   [[ -t 1 ]] && opts+=(-o /dev/null)
+
   curl "${opts[@]}" --http1.1 --tcp-nodelay --keepalive -fs -m2 --no-buffer "$BASE/$1" || rc=$?
 
   [[ $rc -gt 0 && ${3:-} != --silent ]] && {
