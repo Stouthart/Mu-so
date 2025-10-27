@@ -27,20 +27,18 @@ cycle() {
 
 # Send HTTP request — fetch <path> [method]
 fetch() {
-  local msg opts=(-X "${2:-GET}") rc=0
+  local err opts=(-X "${2:-GET}") rc=0
   [[ -t 1 ]] && opts+=(-o /dev/null)
-  curl "${opts[@]}" --http1.1 --tcp-nodelay --keepalive -fsS -m2 --no-buffer "$BASE/$1" 2>/dev/null || rc=$?
+  curl "${opts[@]}" --http1.1 --tcp-nodelay --keepalive -fs -m2 --no-buffer "$BASE/$1" || rc=$?
 
-  [[ ${3:-} == --silent ]] || {
+  [[ $rc -gt 0 && ${3:-} != --silent ]] && {
     case $rc in
-    0) ;;
-    7) msg='Cannot connect to Mu-so.' ;;
-    22) msg='Mu-so is in standby.' ;;
-    28) msg='Operation timed out.' ;;
-    *) msg="curl error ($rc)" ;;
+    7) err='Cannot connect to Mu-so.' ;;
+    22) err='Mu-so is in standby.' ;;
+    28) err='Operation timed out.' ;;
+    *) err="curl error ($rc)" ;;
     esac
-
-    [[ $rc -gt 0 ]] && echo "$msg" >&2
+    echo "$err" >&2
   }
 
   return $rc
