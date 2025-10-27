@@ -64,7 +64,7 @@ usage() {
   printf 'Inputs:\n  input | radio\n\n'
   printf 'Playback:\n  next | pause | play | playpause | prev | stop\n  shuffle | repeat\n\n'
   printf 'Audio:\n  loudness | mono | mute | volume <0..100>\n\n'
-  printf 'Information:\n  levels | multiroom | network | nowplaying\n  outputs | power | system | update\n'
+  printf 'Status:\n  levels | multiroom | network | nowplaying\n  outputs | power | system | update\n'
 }
 
 # Option aliases
