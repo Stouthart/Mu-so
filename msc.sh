@@ -4,31 +4,30 @@ IFS=$'\n\t'
 
 BASE="http://${MUSO_HOST:-mu-so}:15081"
 
-# Send HTTP request — <path> [method]
-fetch() {
-  local msg opts=(-X "${2:-GET}") rc=0
-  [[ -t 1 ]] && opts+=(-o /dev/null)
-
-  curl "${opts[@]}" --http1.1 --tcp-nodelay --keepalive-time 15 -fs -m3 --no-buffer "$BASE/$1" || rc=$?
-
-  if ((rc > 0)); then
-    case $rc in
-    7) msg='Cannot connect to Mu-so.' ;;
-    22) msg='Mu-so is in standby.' ;;
-    28) msg='Operation timed out.' ;;
-    *) msg="curl error ($rc)." ;;
-    esac
-
-    echo "$msg" >&2
-    return $rc
-  fi
+# Print error message, return failure
+error() {
+  printf '%s\n' "$1" >&2
+  return 1
 }
 
-# Fetch JSON and filter with jq — <endpoint> <jq_filter>
+# Send HTTP request — <path> [method]
+fetch() {
+  local opts=(-X "${2:-GET}")
+  [[ -t 1 ]] && opts+=(-o /dev/null)
+
+  curl "${opts[@]}" --http1.1 --tcp-nodelay --keepalive-time 15 -fs -m3 --no-buffer "$BASE/$1" || {
+    case $? in
+    7) error 'Cannot connect to Mu-so.' ;;
+    22) error 'Mu-so is in standby.' ;;
+    28) error 'Operation timed out.' ;;
+    *) error "curl error ($?)." ;;
+    esac
+  }
+}
+
+# Fetch JSON, filter with jq — <endpoint> <jq_filter>
 fjson() {
-  local data
-  data=$(fetch "$1") || return $?
-  jq -cr "$2" <<<"$data"
+  fetch "$1" | jq -cr "$2"
 }
 
 # List options, prompt user, play — <endpoint> <jq_filter>
@@ -48,29 +47,60 @@ prompt() {
   fetch "${urls[REPLY - 1]}?cmd=play"
 }
 
-# Get or toggle state — <endpoint> <key> <get> [mod]
+# Get, set, or toggle state — <endpoint> <key> <arg> [mod]
 state() {
-  if [[ $3 == ? ]]; then
+  local mod=${4:-2} val
+
+  case $3 in
+  \?)
     fjson "$1" ".\"$2\"//empty"
-  else
-    local val
-    val=$(fjson "$1" "(.$2|tonumber+1)%${4:-2}") || return $?
-    fetch "$1?$2=$val" PUT --silent
-  fi
+    return
+    ;;
+  '')
+    val=$(fjson "$1" "(.$2|tonumber+1)%$mod") || return $?
+    ;;
+  *)
+    if [[ $3 =~ ^[0-9]$ && $3 -lt mod ]]; then
+      val=$3
+    else
+      error 'Invalid argument.'
+    fi
+    ;;
+  esac
+
+  fetch "$1?$2=$val" PUT
 }
 
 # Display help text
 usage() {
-  local name=${0##*/}
+  local name=${0##*/} ver=v3.1
 
-  printf '%s v3.0 - Control Naim Mu-so over HTTP\nCopyright © 2025 Stouthart. All rights reserved.\n\n' "$name"
-  printf 'Usage: %s <option> [argument]\n\n' "$name"
-  printf 'Power:\n standby | wake\n\n'
-  printf 'Inputs:\n input | radio\n\n'
-  printf 'Playback:\n next | pause | play | prev | stop\n shuffle | repeat\n\n'
-  printf 'Audio:\n loudness | mono | mute | volume <0..100>\n\n'
-  printf 'Other:\n lighting\n\n'
-  printf 'Status:\n levels | network | nowplaying [key]\n outputs | power | system | update\n'
+  cat <<EOF
+$name $ver - Control Naim Mu-so over HTTP
+Copyright © 2025 Stouthart. All rights reserved.
+
+Usage: $name <option> [argument]
+
+Power:
+ standby | wake
+
+Inputs:
+ input | radio
+
+Playback:
+ next | pause | play | prev | stop
+ shuffle | repeat
+
+Audio:
+ loudness | mono | mute | volume <0..100>
+
+Other:
+ lighting <0..2>
+
+Status:
+ levels | network | nowplaying [key]
+ outputs | power | system | update
+EOF
 }
 
 opt=${1:-}
@@ -120,25 +150,25 @@ volume)
   elif [[ $arg =~ ^[0-9]+$ && $arg -le 100 ]]; then
     fetch "levels?$opt=$arg" PUT
   else
-    echo 'Missing or invalid argument.' >&2
-    exit 1
+    error 'Missing or invalid argument.'
   fi
   ;;
 lighting)
   state userinterface lightTheme "$arg" 3
   ;;
 levels | network | nowplaying | outputs | power | system | update)
-  if [[ ${arg:-} =~ ^[[:alnum:]]+$ ]]; then
+  if [[ -z $arg ]]; then
+    fjson "$opt" 'to_entries[5:][]|select(.key|IN("children","cpu")|not)|"\(.key)=\(.value)"'
+  elif [[ $arg =~ ^[[:alnum:]]+$ ]]; then
     fjson "$opt" ".\"$arg\"//empty"
   else
-    fjson "$opt" 'to_entries[5:][]|select(.key|IN("children","cpu")|not)|"\(.key)=\(.value)"'
+    error 'Invalid argument.'
   fi
   ;;
 help | -h | --help)
   usage
   ;;
 *)
-  echo 'Missing or invalid option.' >&2
-  exit 1
+  error 'Missing or invalid option.'
   ;;
 esac
