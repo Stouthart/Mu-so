@@ -25,12 +25,12 @@ fetch() {
   }
 }
 
-# Fetch JSON, filter with jq — <endpoint> <jq_filter>
+# Fetch JSON, filter with jq — <endpoint> <filter>
 fjson() {
   fetch "$1" | jq -cr "$2"
 }
 
-# List options, prompt user, play — <endpoint> <jq_filter>
+# List options, prompt user, play — <endpoint> <filter>
 prompt() {
   local id names=() nm PS3='Enter option: ' urls=()
 
@@ -41,37 +41,31 @@ prompt() {
 
   select nm in "${names[@]}"; do
     [[ $nm ]] && break
-    echo 'Invalid option.' >&2
+    printf 'Invalid option.\n' >&2
   done
 
   fetch "${urls[REPLY - 1]}?cmd=play"
 }
 
-# Get, set, or toggle state — <endpoint> <key> <arg> [mod]
+# Toggle, get, or set state — <endpoint> <key> <arg> [mod]
 state() {
   local mod=${4:-2} val
 
-  case $3 in
-  \?)
+  if [[ -z $3 ]]; then
+    val=$(fjson "$1" "(.$2|tonumber+1)%$mod")
+  elif [[ $3 == \? ]]; then
     fjson "$1" ".\"$2\"//empty"
     return
-    ;;
-  '')
-    val=$(fjson "$1" "(.$2|tonumber+1)%$mod") || return $?
-    ;;
-  *)
-    if [[ $3 =~ ^[0-9]$ && $3 -lt mod ]]; then
-      val=$3
-    else
-      error 'Invalid argument.'
-    fi
-    ;;
-  esac
+  elif [[ $3 =~ ^[0-9]$ && $3 -lt $mod ]]; then
+    val=$3
+  else
+    error 'Invalid argument.'
+  fi
 
   fetch "$1?$2=$val" PUT
 }
 
-# Display help text
+# Display help
 usage() {
   local name=${0##*/} ver=v3.1
 
@@ -145,7 +139,7 @@ mute)
   state levels "$opt" "$arg"
   ;;
 volume)
-  if [[ $arg == ? ]]; then
+  if [[ $arg == \? ]]; then
     fjson levels ".\"$opt\"//empty"
   elif [[ $arg =~ ^[0-9]+$ && $arg -le 100 ]]; then
     fetch "levels?$opt=$arg" PUT
