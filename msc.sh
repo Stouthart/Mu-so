@@ -15,12 +15,11 @@ fetch() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
 
-  curl -o "$out" -X "${2:-GET}" --http1.1 --no-buffer -fs --tcp-nodelay --keepalive-time 10 -m5 "$BASE/$1" || {
+  wget -O "$out" --method "${2:-GET}" --no-cookies -qT2 --tries=1 "$BASE/$1" || {
     case $? in
-    7) error 'Network failure.' ;;
+    4) error 'Network failure.' ;;
     8) error 'Failed, Mu-so in standby?' ;;
-    28) error 'Operation timeout.' ;;
-    *) error "curl error ($?)." ;;
+    *) error "wget error ($?)." ;;
     esac
   }
 }
@@ -73,7 +72,6 @@ usage() {
   cat <<EOF
 $name v3.3 - Control Naim Mu-so over HTTP
 Copyright © 2025 Stouthart. All rights reserved.
-
 
 Usage: $name <option> [argument]
 
