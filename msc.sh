@@ -4,7 +4,7 @@ IFS=$'\n\t'
 
 BASE="http://${MUSO_HOST:-mu-so}:15081"
 
-# Print error message, return failure
+# Show error message, return failure
 error() {
   echo "$1" >&2
   return 1
@@ -27,6 +27,20 @@ fetch() {
 # Fetch JSON, filter with jq — <endpoint> <filter>
 fjson() {
   fetch "$1" | jq -cr "$2"
+}
+
+# Show now playing information
+info() {
+  local arr data
+  data=$(fjson nowplaying '[.artistName//"?",.title//"?",.albumName//"?",.transportPosition//0,
+    .duration//0,.codec//"?",.sampleRate//0,.bitDepth//0,(.source|sub("^inputs/";"")//"?")]|@tsv')
+  read -ra arr <<<"$data"
+
+  fmt() { printf '%d:%02d' "$(($1 / 60000))" "$((($1 / 1000) % 60))"; }
+  arr[3]=$(fmt "${arr[3]}")
+  arr[4]=$(fmt "${arr[4]}")
+
+  printf '%s / %s [%s]\n%s / %s - %s %s %s-bit [%s]\n' "${arr[@]}"
 }
 
 # List options, prompt user, and play — <endpoint> <filter>
@@ -65,12 +79,12 @@ state() {
   fetch "$1?$2=$val" PUT
 }
 
-# Display help text
+# Show help/usage text
 usage() {
   local name=${0##*/}
 
   cat <<EOF
-$name v3.3 - Control Naim Mu-so over HTTP
+$name v3.4 - Control Naim Mu-so over HTTP
 Copyright © 2025 Stouthart. All rights reserved.
 
 Usage: $name <option> [argument]
@@ -91,7 +105,7 @@ Audio:
 Other:
  lighting <0..2>
 
-Status:
+Info:
  levels | network | nowplaying
  outputs | power | system | update
 EOF
@@ -102,7 +116,7 @@ arg=${2:-}
 
 # Option aliases/mappings
 case $opt in
-now) opt=nowplaying ;;
+info) opt=nowplaying ;;
 pause) opt=playpause ;;
 sleep) opt=standby ;;
 vol) opt=volume ;;
@@ -153,7 +167,10 @@ volume)
 lighting)
   state userinterface lightTheme "$arg" 3
   ;;
-levels | network | nowplaying | outputs | power | system | update)
+nowplaying)
+  info
+  ;;
+levels | network | outputs | power | system | update)
   if [[ -z $arg ]]; then
     fjson "$opt" 'to_entries[5:][]|select(.key|IN("children","cpu")|not)|"\(.key)=\(.value)"'
   elif [[ $arg =~ ^[[:alnum:]]+$ ]]; then
