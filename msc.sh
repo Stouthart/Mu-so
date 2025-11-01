@@ -85,7 +85,7 @@ usage() {
   local name=${0##*/}
 
   cat <<EOF
-$name v3.4 - Control Naim Mu-so 2nd Gen. over HTTP
+$name v3.5 - Control Naim Mu-so 2nd Gen. over HTTP
 Copyright © 2025 Stouthart. All rights reserved.
 
 Usage: $name <option> [argument]
@@ -107,7 +107,7 @@ Other:
  lighting <0..2>
 
 Info:
- levels | network | nowplaying
+ capabilities | levels | network | nowplaying
  outputs | power | system | update
 EOF
 }
@@ -117,6 +117,7 @@ arg=${2:-}
 
 # Option aliases/mappings
 case $opt in
+capabilities) opt='system/capabilities' ;;
 info) opt=nowplaying ;;
 pause) opt=playpause ;;
 sleep) opt=standby ;;
@@ -171,7 +172,7 @@ lighting)
 nowplaying)
   info
   ;;
-levels | network | outputs | power | system | update)
+levels | network | outputs | power | system | system/capabilities | update)
   if [[ -z $arg ]]; then
     fjson "$opt" 'to_entries[5:][]|select(.key|IN("children","cpu")|not)|"\(.key)=\(.value)"'
   elif [[ $arg =~ ^[[:alnum:]]+$ ]]; then
