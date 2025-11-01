@@ -32,8 +32,9 @@ fjson() {
 # Show now playing information
 info() {
   local arr data
-  data=$(fjson nowplaying '[.artistName//"?",.title//"?",.albumName//"?",.transportPosition//0,
-    .duration//0,.codec//"?",.sampleRate//0,.bitDepth//0,(.source|sub("^inputs/";"")//"?")]|@tsv')
+  data=$(fjson nowplaying '[.artistName//"?",.title//"?",.albumName//"?",
+    .transportPosition//0,.duration//0,.codec//"?",.sampleRate//0,.bitDepth//0,
+    if .sourceDetail != null then .sourceDetail else .source|sub("^inputs/";"")//"?" end]|@tsv')
   read -ra arr <<<"$data"
 
   fmt() { printf '%d:%02d' "$(($1 / 60000))" "$((($1 / 1000) % 60))"; }
