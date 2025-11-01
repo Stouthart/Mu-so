@@ -33,15 +33,16 @@ fjson() {
 # Show now playing information
 info() {
   local arr data
-  data=$(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,
-    .codec,.sampleRate,.bitDepth,.sourceDetail//(.source|sub("^inputs/";""))]|map(.//"?")|@tsv')
+  data=$(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,.sampleRate,
+    if (.bitRate|tonumber)>=64000 then .bitRate|tonumber/1000|tostring+"kb/s" else .bitDepth+"-bit" end,
+    .sourceDetail//(.source|sub("^inputs/";""))]|map(.//"?")|@tsv')
   read -ra arr <<<"$data"
 
   fmt() { printf '%d:%02d' "$(($1 / 60000))" "$((($1 / 1000) % 60))"; }
   arr[3]=$(fmt "${arr[3]}")
   arr[4]=$(fmt "${arr[4]}")
 
-  printf '%s / %s [%s]\n%s / %s - %s %s %s-bit [%s]\n' "${arr[@]}"
+  printf '%s / %s [%s]\n%s / %s - %s %s %s [%s]\n' "${arr[@]}"
 }
 
 # List options, prompt user, and play — <endpoint> <filter>
@@ -160,7 +161,7 @@ volume)
   elif [[ $arg =~ ^[0-9]+$ && $arg -le 100 ]]; then
     fetch "levels?$opt=$arg" PUT
   elif [[ $arg =~ ^[+-]([0-9]+)$ && ${BASH_REMATCH[1]} -le 100 ]]; then
-    arg=$(fjson levels ".volume|tonumber+${BASH_REMATCH[1]}|max(0)|min(100)")
+    arg=$(fjson levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
     fetch "levels?$opt=$arg" PUT
   else
     error 'Missing or invalid argument.'
