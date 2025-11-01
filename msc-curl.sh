@@ -34,7 +34,7 @@ fjson() {
 info() {
   local arr data
   data=$(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,.sampleRate,
-    if (.bitRate|tonumber)>=64000 then .bitRate|tonumber/1000|tostring+"kb/s" else .bitDepth+"-bit" end,
+    if (.bitRate//0|tonumber)>=64000 then .bitRate|tonumber/1000|tostring+"kb/s" else .bitDepth//"?"+"-bit" end,
     .sourceDetail//(.source|sub("^inputs/";""))]|map(.//"?")|@tsv')
   read -ra arr <<<"$data"
 
