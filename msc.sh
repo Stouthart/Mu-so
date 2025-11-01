@@ -33,8 +33,8 @@ fjson() {
 info() {
   local arr data
   data=$(fjson nowplaying '[.artistName//"?",.title//"?",.albumName//"?",
-    .transportPosition//0,.duration//0,.codec//"?",.sampleRate//0,.bitDepth//0,
-    if .sourceDetail != null then .sourceDetail else .source|sub("^inputs/";"")//"?" end]|@tsv')
+  .transportPosition//0,.duration//0,.codec//"?",.sampleRate//0,.bitDepth//0,
+  if .sourceDetail != null then .sourceDetail else .source|sub("^inputs/";"")//"?" end]|@tsv')
   read -ra arr <<<"$data"
 
   fmt() { printf '%d:%02d' "$(($1 / 60000))" "$((($1 / 1000) % 60))"; }
@@ -91,24 +91,24 @@ Copyright © 2025 Stouthart. All rights reserved.
 Usage: $name <option> [argument]
 
 Power:
- standby | wake
+  standby | wake
 
 Inputs:
- input | radio
+  input | radio
 
 Playback:
- next | pause | play | prev | stop
- shuffle | repeat
+  next | pause | play | prev | stop
+  shuffle | repeat
 
 Audio:
- loudness | mono | mute | volume <0..100>
+  loudness | mono | mute | volume <0..100>
 
 Other:
- lighting <0..2>
+  lighting <0..2>
 
 Info:
- capabilities | levels | network | nowplaying
- outputs | power | system | update
+  capabilities | levels | network | nowplaying
+  outputs | power | system | update
 EOF
 }
 
