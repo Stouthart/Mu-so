@@ -33,9 +33,11 @@ fjson() {
 # Show now playing information
 info() {
   local arr data
-  data=$(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,.sampleRate,
-    if (.bitRate//0|tonumber)>=64000 then .bitRate|tonumber/1000|tostring+"kb/s" else .bitDepth//"?"+"-bit" end,
-    .sourceDetail//(.source|sub("^inputs/";""))]|map(.//"?")|@tsv')
+
+  data=$(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,(.sampleRate//"0")+"Hz",
+    if .codec=="FLAC" or .codec=="WAV" then (.bitDepth//"0")+"-bit" else .bitRate//0|tonumber/1000|tostring+"kb/s" end,
+    (.sourceDetail//.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
+
   read -ra arr <<<"$data"
 
   fmt() { printf '%d:%02d' "$(($1 / 60000))" "$((($1 / 1000) % 60))"; }
