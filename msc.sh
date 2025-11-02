@@ -33,8 +33,8 @@ fjson() {
 info() {
   local arr data
 
-  data=$(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,
-    .duration//0,.codec,(.sampleRate//0|tonumber/1000|tostring+"kHz"),
+  data=$(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
+    (.sampleRate//0|tonumber/1000|tostring+"kHz"),
     if .codec=="FLAC" or .codec=="WAV" then (.bitDepth//"0")+"-bit" else .bitRate//0|tonumber/1000|tostring+"kb/s" end,
     (.sourceDetail//.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
 
@@ -160,10 +160,8 @@ mute)
 volume)
   if [[ $arg == \? ]]; then
     fjson levels ".\"$opt\"//empty"
-  elif [[ $arg =~ ^[0-9]+$ && $arg -le 100 ]]; then
-    fetch "levels?$opt=$arg" PUT
-  elif [[ $arg =~ ^[+-]([0-9]+)$ && ${BASH_REMATCH[1]} -le 100 ]]; then
-    arg=$(fjson levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
+  elif [[ $arg =~ ^([+-]?)([0-9]+)$ && ${BASH_REMATCH[2]} -le 100 ]]; then
+    [[ ${BASH_REMATCH[1]:-} ]] && arg=$(fjson levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
     fetch "levels?$opt=$arg" PUT
   else
     error 'Missing or invalid argument.'
