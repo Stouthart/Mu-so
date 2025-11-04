@@ -34,8 +34,8 @@ info() {
   local arr data
 
   data=$(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
-    (.sampleRate//0|tonumber/1000),.bitDepth//"0",(.bitRate//0|tonumber|if .<16000 then . else ./1000|round end),
-    (.sourceDetail//.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
+    (.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if .<16000 then . else ./1000|round end),
+    (.sourceDetail//.source|sub("^inputs/";""))]|map(.//"?")|@tsv')
 
   read -ra arr <<<"$data"
 
@@ -43,7 +43,7 @@ info() {
   arr[3]=$(fmt "${arr[3]}")
   arr[4]=$(fmt "${arr[4]}")
 
-  printf '%s / %s [%s]\n%s / %s - %s %skHz %dbit %dkb/s [%s]\n' "${arr[@]}"
+  printf '%s / %s [%s]\n%s / %s - %s %skHz %sbit %skb/s [%s]\n' "${arr[@]}"
 }
 
 # List options, prompt user, and play — <endpoint> <filter>
