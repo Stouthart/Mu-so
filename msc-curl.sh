@@ -7,7 +7,7 @@ BASE="http://${MUSO_HOST:-mu-so}:15081"
 # Show error message, return failure
 error() {
   echo "$1" >&2
-  return 1
+  exit 1
 }
 
 # Send HTTP request — <path> [method]
@@ -32,13 +32,11 @@ fjson() {
 
 # Show now playing information
 now() {
-  local arr data
+  local arr
 
-  data=$(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
+  read -ra arr < <(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
     (.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
     .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
-
-  read -ra arr <<<"$data"
 
   fmt() { printf '%d:%02d' "$(($1 / 60000))" "$((($1 / 1000) % 60))"; }
   arr[3]=$(fmt "${arr[3]}")
@@ -65,6 +63,28 @@ prompt() {
   fetch "${urls[REPLY - 1]}?cmd=play"
 }
 
+# Seek to playback position - <arg>
+seek() {
+  local dur pos val
+  read -r pos dur < <(fjson nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
+
+  if [[ $arg =~ ^([+-]?)([0-9]+)$ && ${BASH_REMATCH[2]} -lt $dur ]]; then
+    val=${BASH_REMATCH[2]}
+
+    case ${BASH_REMATCH[1]} in
+    +) ((val += pos)) ;;
+    -) ((val = pos - val)) ;;
+    esac
+
+    ((val < 0)) && val=0
+    ((val >= dur)) && ((val = dur - 1))
+
+    fetch "nowplaying?cmd=seek&position=$((val * 1000))"
+  else
+    error 'Missing or invalid argument.'
+  fi
+}
+
 # Toggle, get, or set state — <arg> <endpoint> <key> [mod]
 state() {
   local mod=${4:-2} val
@@ -88,7 +108,7 @@ usage() {
   local name=${0##*/}
 
   cat <<EOF
-$name v4.1 - Control Naim Mu-so 2nd Gen. over HTTP
+$name v4.2 - Control Naim Mu-so 2nd Gen. over HTTP
 Copyright © 2025 Stouthart. All rights reserved.
 
 Usage: $name <option> [argument]
@@ -101,7 +121,7 @@ Inputs:
 
 Playback:
   next | pause | play | prev | stop
-  shuffle | repeat
+  seek <sec> | shuffle | repeat
 
 Playqueue:
   clear | queue
@@ -148,6 +168,9 @@ radio)
   ;;
 next | play | playpause | prev | stop)
   fetch "nowplaying?cmd=$opt"
+  ;;
+seek)
+  seek "$arg"
   ;;
 shuffle)
   state "$arg" nowplaying shuffle
