@@ -7,7 +7,7 @@ BASE="http://${MUSO_HOST:-mu-so}:15081"
 # Show error message, return failure
 error() {
   echo "$1" >&2
-  exit 1
+  return 1
 }
 
 # Send HTTP request — <path> [method]
@@ -35,7 +35,7 @@ now() {
   local arr data
 
   data=$(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
-    (.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if .<16000 then . else ./1000|round end),
+    (.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
     .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
 
   read -ra arr <<<"$data"
@@ -159,7 +159,7 @@ clear)
   fetch inputs/playqueue?clear=true POST
   ;;
 playqueue)
-  fjson inputs/playqueue '.children//[]|.[]|"\(.artistName//"?") / \(.name//"?") [\(.albumName//"?")]"'
+  fjson inputs/playqueue '.children[]?|"\(.artistName//"?") / \(.name//"?") [\(.albumName//"?")]"'
   ;;
 loudness | mono)
   state outputs "$opt" "$arg"
@@ -185,7 +185,7 @@ nowplaying)
   ;;
 system/capabilities | levels | network | outputs | power | system | update)
   if [[ -z $arg ]]; then
-    fjson "$opt" 'to_entries[5:][]|select(.key!="cpu" and .key!="children")|"\(.key)=\(.value)"'
+    fjson "$opt" 'to_entries[5:][]|select(.key!="cpu"and.key!="children")|"\(.key)=\(.value)"'
   elif [[ $arg =~ ^[[:alnum:]]+$ ]]; then
     fjson "$opt" ".\"$arg\"//empty"
   else
