@@ -159,7 +159,7 @@ clear)
   fetch inputs/playqueue?clear=true POST
   ;;
 playqueue)
-  fjson inputs/playqueue '.children[]?|"\(.artistName//"?") / \(.name//"?") [\(.albumName//"?")]"'
+  fjson inputs/playqueue '.children[]?|"\(.artistName//"?") / \(.name) [\(.albumName//"?")]"'
   ;;
 loudness | mono)
   state outputs "$opt" "$arg"
