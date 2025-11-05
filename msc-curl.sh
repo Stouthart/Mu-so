@@ -69,18 +69,18 @@ prompt() {
 state() {
   local mod=${4:-2} val
 
-  if [[ -z $3 ]]; then
-    val=$(fjson "$1" ".$2|(tonumber+1)%$mod")
-  elif [[ $3 == \? ]]; then
-    fjson "$1" ".\"$2\"//empty"
+  if [[ -z $1 ]]; then
+    val=$(fjson "$2" ".$3|(tonumber+1)%$mod")
+  elif [[ $1 == \? ]]; then
+    fjson "$2" ".\"$3\"//empty"
     return
-  elif [[ $3 =~ ^[0-9]$ && $3 -lt $mod ]]; then
-    val=$3
+  elif [[ $1 =~ ^[0-9]$ && $1 -lt $mod ]]; then
+    val=$1
   else
     error 'Invalid argument.'
   fi
 
-  fetch "$1?$2=$val" PUT
+  fetch "$2?$3=$val" PUT
 }
 
 # Show help/usage text
@@ -150,10 +150,10 @@ next | play | playpause | prev | stop)
   fetch "nowplaying?cmd=$opt"
   ;;
 shuffle)
-  state nowplaying shuffle "$arg"
+  state "$arg" nowplaying shuffle
   ;;
 repeat)
-  state nowplaying repeat "$arg" 3
+  state "$arg" nowplaying repeat 3
   ;;
 clear)
   fetch inputs/playqueue?clear=true POST
@@ -162,10 +162,10 @@ playqueue)
   fjson inputs/playqueue '.children[]?|"\(.artistName//"?") / \(.name) [\(.albumName//"?")]"'
   ;;
 loudness | mono)
-  state outputs "$opt" "$arg"
+  state "$arg" outputs "$opt"
   ;;
 mute)
-  state levels mute "$arg"
+  state "$arg" levels mute
   ;;
 volume)
   if [[ $arg == \? ]]; then
@@ -178,7 +178,7 @@ volume)
   fi
   ;;
 lighting)
-  state userinterface lightTheme "$arg" 3
+  state "$arg" userinterface lightTheme 3
   ;;
 nowplaying)
   now
