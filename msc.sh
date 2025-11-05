@@ -64,7 +64,7 @@ prompt() {
   fetch "${urls[REPLY - 1]}?cmd=play"
 }
 
-# Toggle, get, or set state — <endpoint> <key> <arg> [mod]
+# Toggle, get, or set state — <arg> <endpoint> <key> [mod]
 state() {
   local mod=${4:-2} val
 
