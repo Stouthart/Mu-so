@@ -36,7 +36,7 @@ info() {
 
   data=$(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
     (.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if .<16000 then . else ./1000|round end),
-    (.sourceDetail//.source|sub("^inputs/";""))]|map(.//"?")|@tsv')
+    .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
 
   read -ra arr <<<"$data"
 
@@ -65,7 +65,7 @@ prompt() {
   fetch "${urls[REPLY - 1]}?cmd=play"
 }
 
-# Toggle, get, or set state — <endpoint> <key> <arg> [mod]
+# Toggle, get or set state — <endpoint> <key> <arg> [mod]
 state() {
   local mod=${4:-2} val
 
@@ -88,7 +88,7 @@ usage() {
   local name=${0##*/}
 
   cat <<EOF
-$name v3.5 - Control Naim Mu-so 2nd Gen. over HTTP
+$name v4.0 - Control Naim Mu-so 2nd Gen. over HTTP
 Copyright © 2025 Stouthart. All rights reserved.
 
 Usage: $name <option> [argument]
