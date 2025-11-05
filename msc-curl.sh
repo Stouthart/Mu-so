@@ -66,9 +66,9 @@ prompt() {
 # Seek to playback position - <arg>
 seek() {
   local dur pos val
-  read -r pos dur < <(fjson nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
 
-  if [[ $arg =~ ^([+-]?)([0-9]+)$ && ${BASH_REMATCH[2]} -lt $dur ]]; then
+  if [[ $arg =~ ^([+-]?)([0-9]+)$ && ${BASH_REMATCH[2]} -le 3600 ]]; then
+    read -r pos dur < <(fjson nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
     val=${BASH_REMATCH[2]}
 
     case ${BASH_REMATCH[1]} in
