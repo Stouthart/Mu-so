@@ -7,7 +7,7 @@ BASE="http://${MUSO_HOST:-mu-so}:15081"
 # Show error message, return failure
 error() {
   echo "$1" >&2
-  return 1
+  exit 1
 }
 
 # Send HTTP request — <path> [method]
@@ -30,7 +30,7 @@ fjson() {
 }
 
 # Show now playing information
-info() {
+now() {
   local arr data
 
   data=$(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
@@ -64,7 +64,7 @@ prompt() {
   fetch "${urls[REPLY - 1]}?cmd=play"
 }
 
-# Toggle, get or set state — <endpoint> <key> <arg> [mod]
+# Toggle, get, or set state — <endpoint> <key> <arg> [mod]
 state() {
   local mod=${4:-2} val
 
@@ -87,7 +87,7 @@ usage() {
   local name=${0##*/}
 
   cat <<EOF
-$name v4.0 - Control Naim Mu-so 2nd Gen. over HTTP
+$name v4.1 - Control Naim Mu-so 2nd Gen. over HTTP
 Copyright © 2025 Stouthart. All rights reserved.
 
 Usage: $name <option> [argument]
@@ -102,13 +102,16 @@ Playback:
   next | pause | play | prev | stop
   shuffle | repeat
 
+Playqueue:
+  clear | queue
+
 Audio:
   loudness | mono | mute | volume <0..100>
 
 Other:
   lighting <0..2>
 
-Info:
+Information:
   capabilities | levels | network | nowplaying
   outputs | power | system | update
 EOF
@@ -120,8 +123,9 @@ arg=${2:-}
 # Option aliases/mappings
 case $opt in
 capabilities) opt='system/capabilities' ;;
-info) opt=nowplaying ;;
+now) opt=nowplaying ;;
 pause) opt=playpause ;;
+queue) opt=playqueue ;;
 sleep) opt=standby ;;
 vol) opt=volume ;;
 esac
@@ -129,10 +133,10 @@ esac
 # Main option handler
 case $opt in
 standby)
-  fetch 'power?system=lona' PUT
+  fetch power?system=lona PUT
   ;;
 wake)
-  fetch 'power?system=on' PUT
+  fetch power?system=on PUT
   ;;
 input)
   prompt inputs '.children[]|select(.disabled=="0")'
@@ -145,23 +149,26 @@ next | play | playpause | prev | stop)
   fetch "nowplaying?cmd=$opt"
   ;;
 shuffle)
-  state nowplaying "$opt" "$arg"
+  state nowplaying shuffle "$arg"
   ;;
 repeat)
-  state nowplaying "$opt" "$arg" 3
+  state nowplaying repeat "$arg" 3
+  ;;
+clear)
+  fetch inputs/playqueue?clear=true POST
   ;;
 loudness | mono)
   state outputs "$opt" "$arg"
   ;;
 mute)
-  state levels "$opt" "$arg"
+  state levels mute "$arg"
   ;;
 volume)
   if [[ $arg == \? ]]; then
     fjson levels ".\"$opt\"//empty"
   elif [[ $arg =~ ^([+-]?)([0-9]+)$ && ${BASH_REMATCH[2]} -le 100 ]]; then
     [[ ${BASH_REMATCH[1]:-} ]] && arg=$(fjson levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
-    fetch "levels?$opt=$arg" PUT
+    fetch "levels?volume=$arg" PUT
   else
     error 'Missing or invalid argument.'
   fi
@@ -170,9 +177,12 @@ lighting)
   state userinterface lightTheme "$arg" 3
   ;;
 nowplaying)
-  info
+  now
   ;;
-levels | network | outputs | power | system | system/capabilities | update)
+playqueue)
+  fjson inputs/playqueue '.children//[]|.[]|"\(.artistName//"?") / \(.name//"?") [\(.albumName//"?")]"'
+  ;;
+system/capabilities | levels | network | outputs | power | system | update)
   if [[ -z $arg ]]; then
     fjson "$opt" 'to_entries[5:][]|select(.key!="cpu" and .key!="children")|"\(.key)=\(.value)"'
   elif [[ $arg =~ ^[[:alnum:]]+$ ]]; then
