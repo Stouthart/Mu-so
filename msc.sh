@@ -122,7 +122,7 @@ arg=${2:-}
 
 # Option aliases/mappings
 case $opt in
-capabilities) opt='system/capabilities' ;;
+capabilities) opt=system/capabilities ;;
 now) opt=nowplaying ;;
 pause) opt=playpause ;;
 queue) opt=playqueue ;;
@@ -157,6 +157,9 @@ repeat)
 clear)
   fetch inputs/playqueue?clear=true POST
   ;;
+playqueue)
+  fjson inputs/playqueue '.children//[]|.[]|"\(.artistName//"?") / \(.name//"?") [\(.albumName//"?")]"'
+  ;;
 loudness | mono)
   state outputs "$opt" "$arg"
   ;;
@@ -178,9 +181,6 @@ lighting)
   ;;
 nowplaying)
   now
-  ;;
-playqueue)
-  fjson inputs/playqueue '.children//[]|.[]|"\(.artistName//"?") / \(.name//"?") [\(.albumName//"?")]"'
   ;;
 system/capabilities | levels | network | outputs | power | system | update)
   if [[ -z $arg ]]; then
