@@ -31,7 +31,7 @@ fjson() {
 }
 
 # Show now playing information
-now() {
+info() {
   local arr
 
   read -ra arr < <(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
@@ -67,7 +67,7 @@ prompt() {
 seek() {
   local dur pos val
 
-  if [[ $arg =~ ^([+-]?)([0-9]+)$ && ${BASH_REMATCH[2]} -le 3600 ]]; then
+  if [[ $arg =~ ^([+-]?)([0-9]{1,4})$ ]] && ((BASH_REMATCH[2] <= 3600)); then
     read -r pos dur < <(fjson nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
     val=${BASH_REMATCH[2]}
 
@@ -144,7 +144,6 @@ arg=${2:-}
 # Option aliases/mappings
 case $opt in
 capabilities) opt=system/capabilities ;;
-now) opt=nowplaying ;;
 pause) opt=playpause ;;
 queue) opt=playqueue ;;
 sleep) opt=standby ;;
@@ -193,8 +192,8 @@ mute)
 volume)
   if [[ $arg == \? ]]; then
     fjson levels ".\"$opt\"//empty"
-  elif [[ $arg =~ ^([+-]?)([0-9]+)$ && ${BASH_REMATCH[2]} -le 100 ]]; then
-    [[ ${BASH_REMATCH[1]:-} ]] && arg=$(fjson levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
+  elif [[ $arg =~ ^([+-]?)([0-9]{1,3})$ ]] && ((BASH_REMATCH[2] <= 100)); then
+    [[ ${BASH_REMATCH[1]} ]] && arg=$(fjson levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
     fetch "levels?volume=$arg" PUT
   else
     error 'Missing or invalid argument.'
@@ -203,13 +202,13 @@ volume)
 lighting)
   state "$arg" userinterface lightTheme 3
   ;;
-nowplaying)
-  now
+info)
+  info
   ;;
-system/capabilities | levels | network | outputs | power | system | update)
+system/capabilities | levels | network | nowplaying | outputs | power | system | update)
   if [[ -z $arg ]]; then
     fjson "$opt" 'to_entries[5:][]|select(.key!="cpu"and.key!="children")|"\(.key)=\(.value)"'
-  elif [[ $arg =~ ^[[:alnum:]]+$ ]]; then
+  elif [[ $arg =~ ^[[:alnum:]]{3,24}$ ]]; then
     fjson "$opt" ".\"$arg\"//empty"
   else
     error 'Invalid argument.'
