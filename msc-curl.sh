@@ -68,9 +68,10 @@ seek() {
   local dur pos val
 
   if [[ $arg =~ ^([+-]?)([0-9]{1,4})$ ]] && ((BASH_REMATCH[2] <= 3600)); then
-    val=${BASH_REMATCH[2]}
-
     read -r pos dur < <(fjson nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
+    ((dur == 0)) && return
+
+    val=${BASH_REMATCH[2]}
 
     case ${BASH_REMATCH[1]} in
     +) ((val += pos)) ;;
@@ -222,3 +223,5 @@ help | -h | --help)
   error 'Missing or invalid option.'
   ;;
 esac
+
+exit
