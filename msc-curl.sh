@@ -68,8 +68,9 @@ seek() {
   local dur pos val
 
   if [[ $arg =~ ^([+-]?)([0-9]{1,4})$ ]] && ((BASH_REMATCH[2] <= 3600)); then
-    read -r pos dur < <(fjson nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
     val=${BASH_REMATCH[2]}
+
+    read -r pos dur < <(fjson nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
 
     case ${BASH_REMATCH[1]} in
     +) ((val += pos)) ;;
