@@ -60,12 +60,12 @@ prompt() {
     echo 'Invalid option.' >&2
   done
 
-  fetch "${urls[REPLY - 1]}?cmd=play"
+  fetch "${urls[REPLY - 1]}?cmd=play" HEAD
 }
 
 # Seek to playback position - <arg>
 seek() {
-  local dur pos val
+  local -i dur pos val
 
   if [[ $arg =~ ^([+-]?)([0-9]{1,4})$ ]] && ((BASH_REMATCH[2] <= 3600)); then
     read -r pos dur < <(fjson nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
@@ -81,28 +81,28 @@ seek() {
     ((val < 0)) && val=0
     ((val >= dur)) && ((val = dur - 1))
 
-    fetch "nowplaying?cmd=seek&position=$((val * 1000))"
+    fetch "nowplaying?cmd=seek&position=$((val * 1000))" HEAD
   else
     error 'Missing or invalid argument.'
   fi
 }
 
-# Toggle, get, or set state — <arg> <endpoint> <key> [mod]
+# Toggle, get, or set state — <endpoint> <key> <arg> [mod]
 state() {
-  local mod=${4:-2} val
+  local -i mod=${4:-2} val
 
-  if [[ -z $1 ]]; then
-    val=$(fjson "$2" ".$3|(tonumber+1)%$mod")
-  elif [[ $1 == \? ]]; then
-    fjson "$2" ".\"$3\"//empty"
+  if [[ -z $3 ]]; then
+    val=$(fjson "$1" ".$2|(tonumber+1)%$mod")
+  elif [[ $3 == \? ]]; then
+    fjson "$1" ".\"$2\"//empty"
     return
-  elif [[ $1 =~ ^[0-9]$ && $1 -lt $mod ]]; then
-    val=$1
+  elif [[ $3 =~ ^[0-9]$ && $3 -lt $mod ]]; then
+    val=$3
   else
     error 'Invalid argument.'
   fi
 
-  fetch "$2?$3=$val" PUT
+  fetch "$1?$2=$val" PUT
 }
 
 # Show help/usage text
@@ -110,7 +110,7 @@ usage() {
   local name=${0##*/}
 
   cat <<EOF
-$name v4.3 - Control Naim Mu-so 2nd Gen. over HTTP
+$name v4.4 - Control Naim Mu-so 2nd Gen. over HTTP
 Copyright © 2025 Stouthart. All rights reserved.
 
 Usage: $name <option> [argument]
@@ -168,16 +168,16 @@ radio)
     '.children|map(select(.favouriteClass|test("^object\\.stream\\.radio")))|sort_by(.presetID|tonumber)[]'
   ;;
 next | play | playpause | prev | stop)
-  fetch "nowplaying?cmd=$opt"
+  fetch "nowplaying?cmd=$opt" HEAD
   ;;
 seek)
   seek "$arg"
   ;;
 shuffle)
-  state "$arg" nowplaying shuffle
+  state nowplaying shuffle "$arg"
   ;;
 repeat)
-  state "$arg" nowplaying repeat 3
+  state nowplaying repeat "$arg" 3
   ;;
 clear)
   fetch inputs/playqueue?clear=true POST
@@ -186,23 +186,23 @@ playqueue)
   fjson inputs/playqueue '.children[]?|"\(.artistName//"?") / \(.name) [\(.albumName//"?")]"'
   ;;
 loudness | mono)
-  state "$arg" outputs "$opt"
+  state outputs "$opt" "$arg"
   ;;
 mute)
-  state "$arg" levels mute
+  state levels mute "$arg"
   ;;
 volume)
   if [[ $arg == \? ]]; then
     fjson levels ".\"$opt\"//empty"
   elif [[ $arg =~ ^([+-]?)([0-9]{1,3})$ ]] && ((BASH_REMATCH[2] <= 100)); then
-    [[ ${BASH_REMATCH[1]} ]] && arg=$(fjson levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
+    [[ -n ${BASH_REMATCH[1]} ]] && arg=$(fjson levels "[.volume|0,tonumber${BASH_REMATCH[0]},100]|sort|.[1]")
     fetch "levels?volume=$arg" PUT
   else
     error 'Missing or invalid argument.'
   fi
   ;;
 lighting)
-  state "$arg" userinterface lightTheme 3
+  state userinterface lightTheme "$arg" 3
   ;;
 info)
   info
