@@ -212,7 +212,7 @@ system/capabilities | levels | network | nowplaying | outputs | power | system |
   if [[ -z $arg ]]; then
     fjson "$opt" 'to_entries[5:][]|select(.key!="cpu"and.key!="children")|"\(.key)=\(.value)"'
   elif [[ $arg =~ ^[[:alnum:]]{3,24}$ ]]; then
-    fjson "$opt" ".\"$arg\"//empty"
+    fjson "$opt" ".\"$arg\"//empty" || true
   else
     error 'Invalid argument.'
   fi
