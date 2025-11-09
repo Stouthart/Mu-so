@@ -47,7 +47,7 @@ info() {
 
 # List options, prompt user, and play — <endpoint> <filter>
 prompt() {
-  local data id names=() nm PS3='Enter option: ' urls=()
+  local data id names=() nm urls=()
   data=$(fjson "$1" "$2|[.name,.ussi]|@tsv")
 
   while read -r nm id; do
@@ -55,6 +55,7 @@ prompt() {
     urls+=("$id")
   done <<<"$data"
 
+  PS3='Enter option: '
   select nm in "${names[@]}"; do
     [[ $nm ]] && break
     echo 'Invalid option.' >&2
@@ -89,7 +90,7 @@ seek() {
 
 # Toggle, get, or set state — <endpoint> <key> <arg> [mod]
 state() {
-  local -i mod=${4:-2} val
+  local mod=${4:-2} val
 
   if [[ -z $3 ]]; then
     val=$(fjson "$1" ".$2|(tonumber+1)%$mod")
