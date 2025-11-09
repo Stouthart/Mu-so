@@ -140,8 +140,8 @@ Information:
 EOF
 }
 
-opt=${1:-}
-arg=${2:-}
+opt=${1-}
+arg=${2-}
 
 # Option aliases/mappings
 case $opt in
