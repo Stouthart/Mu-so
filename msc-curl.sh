@@ -2,6 +2,13 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+[[ ${1-} == --xdbg ]] && {
+  shift
+  PS4='+\e[4G\e[36m$(((${EPOCHREALTIME/./}-_ERT)/1000))\e[9G\e[33m$LINENO\e[13G\e[90m>\e[15G\e[m'
+  declare -ir _ERT=${EPOCHREALTIME/./}
+  set -x
+}
+
 BASE="http://${MUSO_HOST:-mu-so}:15081"
 
 # Show error message, return failure
@@ -111,7 +118,7 @@ usage() {
   local name=${0##*/}
 
   cat <<EOF
-$name v4.4 - Control Naim Mu-so 2nd Gen. over HTTP
+$name v4.5 - Control Naim Mu-so 2nd Gen. over HTTP
 Copyright © 2025 Stouthart. All rights reserved.
 
 Usage: $name <option> [argument]
