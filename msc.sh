@@ -22,7 +22,7 @@ fetch() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
 
-  wget -qt 1 -O "$out" -T 2 --no-cookies --method="${2:-GET}" "$BASE/$1" || {
+  wget -q -t1 -T2 -O"$out" --no-cookies -U'' --method="${2:-GET}" "$BASE/$1" || {
     case $? in
     4) error 'Network failure.' ;;
     8) error 'Failed, Mu-so in standby?' ;;
@@ -44,9 +44,9 @@ info() {
     (.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
     .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
 
-  fmt() { printf '%d:%02d' "$(($1 / 60000))" "$((($1 / 1000) % 60))"; }
-  arr[3]=$(fmt "${arr[3]}")
-  arr[4]=$(fmt "${arr[4]}")
+  fmt() { printf -v "$1" '%d:%02d' "$(($2 / 60000))" "$((($2 / 1000) % 60))"; }
+  fmt 'arr[3]' "${arr[3]}"
+  fmt 'arr[4]' "${arr[4]}"
 
   printf '%s / %s [%s]\n%s / %s - %s %skHz %sbit %skb/s [%s]\n' "${arr[@]}"
 }
