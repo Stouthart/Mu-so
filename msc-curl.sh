@@ -22,7 +22,7 @@ fetch() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
 
-  curl -o"$out" --no-buffer -f -s -m5 -X"${2:-GET}" --http1.1 -H'User-Agent:' --tcp-nodelay "$BASE/$1" || {
+  curl -o"$out" --no-buffer -fs -m4 -X"${2:-GET}" --http1.1 -H'User-Agent:' --tcp-nodelay "$BASE/$1" || {
     case $? in
     7) error 'Network failure.' ;;
     8) error 'Failed, Mu-so in standby?' ;;

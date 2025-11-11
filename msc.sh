@@ -22,7 +22,7 @@ fetch() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
 
-  wget -q -t1 -T2 -O"$out" --no-cookies -U'' --method="${2:-GET}" "$BASE/$1" || {
+  wget -qt1 -T2 -O"$out" --no-cookies -U '' --method="${2:-GET}" "$BASE/$1" || {
     case $? in
     4) error 'Network failure.' ;;
     8) error 'Failed, Mu-so in standby?' ;;
