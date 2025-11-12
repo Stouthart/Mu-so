@@ -9,13 +9,13 @@ IFS=$'\n\t'
   set -x
 }
 
-BASE="http://${MUSO_HOST:-mu-so}:15081"
-
 # Show error message, return failure
 error() {
   echo "$1" >&2
   exit 1
 }
+
+BASE="http://${MUSO_HOST:-mu-so}:15081"
 
 # Send HTTP request — <path> [method]
 fetch() {
