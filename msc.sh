@@ -36,7 +36,7 @@ fjson() {
   fetch "$1" | jq -cre "$2"
 }
 
-# Show now playing information
+# Show now playing status
 info() {
   local arr
 
