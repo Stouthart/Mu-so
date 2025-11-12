@@ -118,7 +118,7 @@ usage() {
   local name=${0##*/}
 
   cat <<EOF
-$name v4.5 - Control Naim Mu-so 2nd Gen. over HTTP
+$name v4.5 - Control Naim Mu-so 2 over HTTP
 Copyright © 2025 Stouthart. All rights reserved.
 
 Usage: $name <option> [argument]
