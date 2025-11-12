@@ -22,7 +22,7 @@ fetch() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
 
-  curl -o"$out" --no-buffer -fs -m4 -X"${2:-GET}" --http1.1 -H'User-Agent:' --tcp-nodelay "$BASE/$1" || {
+  curl -o"$out" -fs -m4 -X"${2:-GET}" --http1.1 -H'User-Agent:' --tcp-nodelay "$BASE/$1" || {
     case $? in
     7) error 'Network failure.' ;;
     8) error 'Failed, Mu-so in standby?' ;;
@@ -39,15 +39,16 @@ fjson() {
 
 # Show now playing status
 info() {
-  local arr
+  local arr sec i
 
   read -ra arr < <(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
     (.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
     .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
 
-  fmt() { printf -v "$1" '%d:%02d' "$(($2 / 60000))" "$((($2 / 1000) % 60))"; }
-  fmt 'arr[3]' "${arr[3]}"
-  fmt 'arr[4]' "${arr[4]}"
+  for i in 3 4; do
+    printf -v sec '%02d' $(((arr[i] / 1000) % 60))
+    arr[i]=$((arr[i] / 60000)):$sec
+  done
 
   printf '%s / %s [%s]\n%s / %s - %s %skHz %sbit %skb/s [%s]\n' "${arr[@]}"
 }
@@ -68,7 +69,7 @@ prompt() {
     echo 'Invalid option.' >&2
   done
 
-  fetch "${urls[REPLY - 1]}?cmd=play" HEAD
+  fetch "${urls[REPLY - 1]}?cmd=play"
 }
 
 # Seek to playback position - <arg>
@@ -89,7 +90,7 @@ seek() {
     ((val < 0)) && val=0
     ((val >= dur)) && ((val = dur - 1))
 
-    fetch "nowplaying?cmd=seek&position=$((val * 1000))" HEAD
+    fetch "nowplaying?cmd=seek&position=$((val * 1000))"
   else
     error 'Missing or invalid argument.'
   fi
@@ -119,7 +120,7 @@ usage() {
 
   cat <<EOF
 $name v4.5 - Control Naim Mu-so 2 over HTTP
-Copyright © 2025 Stouthart. All rights reserved.
+Copyright (C) 2025 Stouthart. All rights reserved.
 
 Usage: $name <option> [argument]
 
@@ -176,7 +177,7 @@ radio)
     '.children|map(select(.favouriteClass|test("^object\\.stream\\.radio")))|sort_by(.presetID|tonumber)[]'
   ;;
 next | play | playpause | prev | stop)
-  fetch "nowplaying?cmd=$opt" HEAD
+  fetch "nowplaying?cmd=$opt"
   ;;
 seek)
   seek "$arg"
