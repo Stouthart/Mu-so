@@ -22,7 +22,7 @@ fetch() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
 
-  wget -qt1 -T2 -O"$out" --no-cookies -U '' --method="${2:-GET}" "$BASE/$1" || {
+  wget -qt1 -T2 -O"$out" -U '' --method="${2:-GET}" "$BASE/$1" || {
     case $? in
     4) error 'Network failure.' ;;
     8) error 'Failed, Mu-so in standby?' ;;
@@ -41,8 +41,8 @@ info() {
   local arr sec i
 
   read -ra arr < <(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
-    (.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
-    .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
+  (.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
+  .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
 
   for i in 3 4; do
     printf -v sec '%02d' $(((arr[i] / 1000) % 60))
@@ -99,11 +99,11 @@ seek() {
 state() {
   local mod=${4:-2} val
 
-  if [[ -z $3 ]]; then
-    val=$(fjson "$1" ".$2|(tonumber+1)%$mod")
-  elif [[ $3 == \? ]]; then
+  if [[ $3 == \? ]]; then
     fjson "$1" ".\"$2\"//empty"
     return
+  elif [[ -z $3 ]]; then
+    val=$(fjson "$1" ".$2|(tonumber+1)%$mod")
   elif [[ $3 =~ ^[0-9]$ && $3 -lt $mod ]]; then
     val=$3
   else
@@ -140,7 +140,7 @@ Audio:
   loudness | mono | mute | volume <0..100>
 
 Other:
-  lighting <0..2>
+  lighting <1..3> | position <1..3>
 
 Information:
   capabilities | levels | network | nowplaying
@@ -211,6 +211,9 @@ volume)
   ;;
 lighting)
   state userinterface lightTheme "$arg" 3
+  ;;
+position)
+  state outputs position "$arg" 3
   ;;
 info)
   info
