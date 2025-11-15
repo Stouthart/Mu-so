@@ -140,7 +140,7 @@ Audio:
   loudness | mono | mute | volume <0..100>
 
 Other:
-  lighting <1..3> | position <1..3>
+  lighting <0..2> | position <0..2>
 
 Information:
   capabilities | levels | network | nowplaying
