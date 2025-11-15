@@ -12,7 +12,7 @@ IFS=$'\n\t'
 # Show error message, return failure
 error() {
   echo "$1" >&2
-  exit 1
+  return 1
 }
 
 BASE="http://${MUSO_HOST:-mu-so}:15081"
@@ -42,8 +42,8 @@ info() {
   local arr sec i
 
   read -ra arr < <(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
-  (.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
-  .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
+    (.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
+    .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
 
   for i in 3 4; do
     printf -v sec '%02d' $(((arr[i] / 1000) % 60))
@@ -155,9 +155,9 @@ arg=${2-}
 # Option aliases/mappings
 case $opt in
 capabilities) opt=system/capabilities ;;
+lighting) opt=lightTheme ;;
 pause) opt=playpause ;;
 queue) opt=playqueue ;;
-sleep) opt=standby ;;
 vol) opt=volume ;;
 esac
 
@@ -202,7 +202,7 @@ mute)
   ;;
 volume)
   if [[ $arg == \? ]]; then
-    fjson levels ".\"$opt\"//empty"
+    fjson levels '."volume"//empty'
   elif [[ $arg =~ ^([+-]?)([0-9]{1,3})$ ]] && ((BASH_REMATCH[2] <= 100)); then
     [[ -n ${BASH_REMATCH[1]} ]] && arg=$(fjson levels "[.volume|0,tonumber${BASH_REMATCH[0]},100]|sort|.[1]")
     fetch "levels?volume=$arg" PUT
@@ -210,7 +210,7 @@ volume)
     error 'Missing or invalid argument.'
   fi
   ;;
-lighting)
+lightTheme)
   state userinterface lightTheme "$arg" 3
   ;;
 position)
@@ -228,7 +228,7 @@ system/capabilities | levels | network | nowplaying | outputs | power | system |
     error 'Invalid argument.'
   fi
   ;;
-help | -h | --help)
+help)
   usage
   ;;
 *)
