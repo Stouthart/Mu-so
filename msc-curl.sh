@@ -15,17 +15,17 @@ error() {
   return 1
 }
 
-BASE="http://${MUSO_HOST:-mu-so}:15081"
+BASE="http://${MUSO_IP:-mu-so}:15081"
 
 # Send HTTP request — <path> [method]
 fetch() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
 
-  curl -o"$out" -fs --retry=1 -m2 -X"${2:-GET}" --http1.1 -H'User-Agent:' --tcp-nodelay "$BASE/$1" || {
+  curl -fs --retry 1 -m2 -o"$out" -H'User-Agent:' -X"${2:-GET}" --http1.1 --tcp-nodelay "$BASE/$1" || {
     case $? in
-    7) error 'Network failure.' ;;
-    8) error 'Failed, Mu-so in standby?' ;;
+    6 | 7 | 8) error 'Network failure.' ;;
+    22) error 'Failed, Mu-so in standby?' ;;
     28) error 'Operation timeout.' ;;
     *) error "curl error ($?)." ;;
     esac

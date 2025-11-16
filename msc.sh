@@ -15,7 +15,7 @@ error() {
   return 1
 }
 
-BASE="http://${MUSO_HOST:-mu-so}:15081"
+BASE="http://${MUSO_IP:-mu-so}:15081"
 
 # Send HTTP request — <path> [method]
 fetch() {
