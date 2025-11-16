@@ -86,9 +86,7 @@ seek() {
     -) ((val = pos - val)) ;;
     esac
 
-    ((val < 0)) && val=0
-    ((val >= dur)) && ((val = dur - 1))
-
+    ((val = val < 0 ? 0 : val >= dur ? dur - 1 : val))
     fetch "nowplaying?cmd=seek&position=$((val * 1000))"
   else
     error 'Missing or invalid argument.'
@@ -115,13 +113,11 @@ state() {
 
 # Show help/usage text
 usage() {
-  local name=${0##*/}
-
   cat <<EOF
-$name v4.5 - Control Naim Mu-so 2 over HTTP
+${0##*/} v4.5 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2025 Stouthart. All rights reserved.
 
-Usage: $name <option> [argument]
+Usage: ${0##*/} <option> [argument]
 
 Power:
   standby | wake
