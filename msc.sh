@@ -203,7 +203,7 @@ volume)
   if [[ $arg == \? ]]; then
     fjson levels '."volume"//empty'
   elif [[ $arg =~ ^([+-]?)([0-9]{1,3})$ ]] && ((BASH_REMATCH[2] <= 100)); then
-    [[ -n ${BASH_REMATCH[1]} ]] && arg=$(fjson levels "[.volume|0,tonumber${BASH_REMATCH[0]},100]|sort|.[1]")
+    [[ -n ${BASH_REMATCH[1]} ]] && arg=$(fjson levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
     fetch "levels?volume=$arg" PUT
   else
     error 'Missing or invalid argument.'
