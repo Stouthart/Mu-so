@@ -79,7 +79,7 @@ play() {
   fi
 }
 
-# Seek position - <arg>
+# Seek to position - <arg>
 seek() {
   local -i dur pos val
 
@@ -101,7 +101,7 @@ seek() {
   fi
 }
 
-# Toggle, get, or set state — <endpoint> <key> <arg> [mod]
+# Toggle, get, or set state — <endpoint> <setting> <arg> [mod]
 state() {
   local mod=${4:-2} val
 
