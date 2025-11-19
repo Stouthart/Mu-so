@@ -104,7 +104,7 @@ seek() {
 state() {
   local mod=${4:-2} val
 
-  if [[ $3 == \? ]]; then
+  if [[ $3 == - ]]; then
     fjson "$1" ".\"$2\"//empty"
     return
   elif [[ -z $3 ]]; then
@@ -202,7 +202,7 @@ mute)
   state levels mute "$arg"
   ;;
 volume)
-  if [[ $arg == \? ]]; then
+  if [[ $arg == - ]]; then
     fjson levels '."volume"//empty'
   elif [[ $arg =~ ^([+-]?)([0-9]{1,3})$ ]] && ((BASH_REMATCH[2] <= 100)); then
     [[ -n ${BASH_REMATCH[1]} ]] && arg=$(fjson levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
