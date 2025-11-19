@@ -9,20 +9,23 @@ IFS=$'\n\t'
   set -x
 }
 
-# Show error message, return failure
+E_INVARG='Invalid argument.'
+E_MISARG='Missing or invalid argument.'
+
+# Print error and return
 error() {
-  echo "$1" >&2
+  printf '%s\n' "$1" >&2
   return 1
 }
 
 BASE="http://${MUSO_IP:-mu-so}:15081"
 
-# Send HTTP request — <path> [method]
+# HTTP request — <path> [method]
 fetch() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
 
-  curl -fs --retry 1 -m2 -o"$out" -H'User-Agent:' -X"${2:-GET}" --http1.1 --tcp-nodelay "$BASE/$1" || {
+  curl -fs --retry 0 -m2 -o"$out" -H'User-Agent:' -X"${2:-GET}" --http1.1 --tcp-nodelay "$BASE/$1" || {
     case $? in
     6 | 7 | 8) error 'Network failure.' ;;
     22) error 'Failed, Mu-so in standby?' ;;
@@ -32,12 +35,12 @@ fetch() {
   }
 }
 
-# Fetch JSON, filter with jq — <endpoint> <filter>
+# Fetch JSON and filter — <endpoint> <filter>
 fjson() {
   fetch "$1" | jq -cre "$2"
 }
 
-# Show now playing status
+# Now playing info
 info() {
   local arr sec i
 
@@ -53,26 +56,29 @@ info() {
   printf '%s / %s [%s]\n%s / %s - %s %skHz %sbit %skb/s [%s]\n' "${arr[@]}"
 }
 
-# List options, prompt user, and play — <endpoint> <filter>
-prompt() {
-  local data id names=() nm urls=()
-  data=$(fjson "$1" "$2|[.name,.ussi]|@tsv")
+# List or play items — <endpoint> <filter> <arg>
+play() {
+  local data id nm names=() urls=()
+  data=$(fjson "$1" ".children[]|select($2)|[.name,.ussi]|@tsv")
 
   while read -r nm id; do
     names+=("$nm")
     urls+=("$id")
   done <<<"$data"
 
-  PS3='Enter option: '
-  select nm in "${names[@]}"; do
-    [[ $nm ]] && break
-    echo 'Invalid option.' >&2
-  done
-
-  fetch "${urls[REPLY - 1]}?cmd=play"
+  if [[ -z $arg ]]; then
+    id=1
+    for nm in "${names[@]}"; do
+      printf '%d) %s\n' $((id++)) "$nm"
+    done
+  elif [[ $arg =~ ^[0-9]{1,2}$ ]] && ((arg > 0 && arg <= ${#urls[@]})); then
+    fetch "${urls[arg - 1]}?cmd=play"
+  else
+    error "$E_INVARG"
+  fi
 }
 
-# Seek to playback position - <arg>
+# Seek position - <arg>
 seek() {
   local -i dur pos val
 
@@ -90,7 +96,7 @@ seek() {
     ((val = val < 0 ? 0 : val >= dur ? dur - 1 : val))
     fetch "nowplaying?cmd=seek&position=$((val * 1000))"
   else
-    error 'Missing or invalid argument.'
+    error "$E_MISARG"
   fi
 }
 
@@ -106,16 +112,16 @@ state() {
   elif [[ $3 =~ ^[0-9]$ && $3 -lt $mod ]]; then
     val=$3
   else
-    error 'Invalid argument.'
+    error "$E_INVARG"
   fi
 
   fetch "$1?$2=$val" PUT
 }
 
-# Show help/usage text
+# Usage instructions
 usage() {
   cat <<EOF
-${0##*/} v4.5 - Control Naim Mu-so 2 over HTTP
+${0##*/} v5.0 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2025 Stouthart. All rights reserved.
 
 Usage: ${0##*/} <option> [argument]
@@ -124,7 +130,7 @@ Power:
   standby | wake
 
 Inputs:
-  input | radio
+  inputs | presets
 
 Playback:
   next | pause | play | prev | stop
@@ -148,7 +154,7 @@ EOF
 opt=${1-}
 arg=${2-}
 
-# Option aliases/mappings
+# Option aliases
 case $opt in
 capabilities) opt=system/capabilities ;;
 lighting) opt=lightTheme ;;
@@ -165,12 +171,11 @@ standby)
 wake)
   fetch power?system=on PUT
   ;;
-input)
-  prompt inputs '.children[]|select(.disabled=="0")'
+inputs)
+  play inputs '.disabled=="0"'
   ;;
-radio)
-  prompt favourites \
-    '.children|map(select(.favouriteClass|test("^object\\.stream\\.radio")))|sort_by(.presetID|tonumber)[]'
+presets)
+  play favourites?sort=D:presetID .stationKey!=null
   ;;
 next | play | playpause | prev | stop)
   fetch "nowplaying?cmd=$opt"
@@ -203,7 +208,7 @@ volume)
     [[ -n ${BASH_REMATCH[1]} ]] && arg=$(fjson levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
     fetch "levels?volume=$arg" PUT
   else
-    error 'Missing or invalid argument.'
+    error "$E_MISARG"
   fi
   ;;
 lightTheme)
@@ -221,7 +226,7 @@ system/capabilities | levels | network | nowplaying | outputs | power | system |
   elif [[ $arg =~ ^[[:alnum:]]{3,24}$ ]]; then
     fjson "$opt" ".\"$arg\"//empty" || true
   else
-    error 'Invalid argument.'
+    error "$E_INVARG"
   fi
   ;;
 help)
