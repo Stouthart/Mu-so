@@ -234,7 +234,7 @@ help)
   usage
   ;;
 *)
-  error 203
+  error 202
   ;;
 esac
 
