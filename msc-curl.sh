@@ -9,13 +9,22 @@ IFS=$'\n\t'
   set -x
 }
 
-E_INVARG='Invalid argument.'
-E_MISARG='Missing or invalid argument.'
-
 # Print error and return
 error() {
-  printf '%s\n' "$1" >&2
-  return 1
+  local msg
+
+  case $1 in
+  6 | 7 | 8) msg='Network failure.' ;;
+  22) msg='Error, Mu-so in standby?' ;;
+  28) msg='Operation timeout.' ;;
+  200) msg='Invalid argument.' ;;
+  201) msg='Missing or invalid argument.' ;;
+  202) msg='Missing or invalid option.' ;;
+  *) msg="curl error ($1)." ;;
+  esac
+
+  printf '%s\n' "$msg" >&2
+  return "$1"
 }
 
 BASE="http://${MUSO_IP:-mu-so}:15081"
@@ -24,15 +33,7 @@ BASE="http://${MUSO_IP:-mu-so}:15081"
 fetch() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
-
-  curl -fs --retry 1 -m2 -o"$out" -H'User-Agent:' -X"${2:-GET}" --http1.1 --tcp-nodelay "$BASE/$1" || {
-    case $? in
-    6 | 7 | 8) error 'Network failure.' ;;
-    22) error 'Failed, Mu-so in standby?' ;;
-    28) error 'Operation timeout.' ;;
-    *) error "curl error ($?)." ;;
-    esac
-  }
+  wget -qt1 -T2 -O"$out" -U '' --method="${2:-GET}" "$BASE/$1" || error $?
 }
 
 # Fetch JSON and filter — <endpoint> <filter>
@@ -74,7 +75,7 @@ play() {
   elif [[ $arg =~ ^[0-9]{1,2}$ ]] && ((arg > 0 && arg <= ${#urls[@]})); then
     fetch "${urls[arg - 1]}?cmd=play"
   else
-    error "$E_INVARG"
+    error 200
   fi
 }
 
@@ -96,7 +97,7 @@ seek() {
     ((val = val < 0 ? 0 : val >= dur ? dur - 1 : val))
     fetch "nowplaying?cmd=seek&position=$((val * 1000))"
   else
-    error "$E_MISARG"
+    error 201
   fi
 }
 
@@ -112,7 +113,7 @@ state() {
   elif [[ $3 =~ ^[0-9]$ && $3 -lt $mod ]]; then
     val=$3
   else
-    error "$E_INVARG"
+    error 200
   fi
 
   fetch "$1?$2=$val" PUT
@@ -208,7 +209,7 @@ volume)
     [[ -n ${BASH_REMATCH[1]} ]] && arg=$(fjson levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
     fetch "levels?volume=$arg" PUT
   else
-    error "$E_MISARG"
+    error 201
   fi
   ;;
 lightTheme)
@@ -226,14 +227,14 @@ system/capabilities | levels | network | nowplaying | outputs | power | system |
   elif [[ $arg =~ ^[[:alnum:]]{3,24}$ ]]; then
     fjson "$opt" ".\"$arg\"//empty" || true
   else
-    error "$E_INVARG"
+    error 200
   fi
   ;;
 help)
   usage
   ;;
 *)
-  error 'Missing or invalid option.'
+  error 203
   ;;
 esac
 
