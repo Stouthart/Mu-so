@@ -20,7 +20,7 @@ error() {
   200) msg='Invalid argument.' ;;
   201) msg='Missing or invalid argument.' ;;
   202) msg='Missing or invalid option.' ;;
-  *) msg="curl error ($1)." ;;
+  *) msg="(curl) error $1." ;;
   esac
 
   printf '%s\n' "$msg" >&2
