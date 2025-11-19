@@ -101,7 +101,7 @@ seek() {
   fi
 }
 
-# Toggle, get, or set state — <endpoint> <setting> <arg> [mod]
+# Get, toggle, or set state — <endpoint> <setting> <arg> [mod]
 state() {
   local mod=${4:-2} val
 
