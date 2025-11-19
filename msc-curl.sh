@@ -33,7 +33,7 @@ BASE="http://${MUSO_IP:-mu-so}:15081"
 fetch() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
-  wget -qt1 -T2 -O"$out" -U '' --method="${2:-GET}" "$BASE/$1" || error $?
+  curl -fs --retry 1 -m2 -o"$out" -H'User-Agent:' -X"${2:-GET}" --http1.1 --tcp-nodelay "$BASE/$1" || error $?
 }
 
 # Fetch JSON and filter — <endpoint> <filter>
