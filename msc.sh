@@ -9,6 +9,15 @@ IFS=$'\n\t'
   set -x
 }
 
+BASE="http://${MUSO_IP:-mu-so}:15081"
+
+# HTTP request — <uri> [method]
+call() {
+  local out=-
+  [[ -t 1 ]] && out=/dev/null
+  wget -qt1 -T2 -O"$out" -U '' --method="${2:-GET}" "$BASE/$1" || error $?
+}
+
 # Print error and return
 error() {
   local msg
@@ -26,25 +35,11 @@ error() {
   return "$1"
 }
 
-BASE="http://${MUSO_IP:-mu-so}:15081"
-
-# HTTP request — <path> [method]
-fetch() {
-  local out=-
-  [[ -t 1 ]] && out=/dev/null
-  wget -qt1 -T2 -O"$out" -U '' --method="${2:-GET}" "$BASE/$1" || error $?
-}
-
-# Fetch JSON and filter — <endpoint> <filter>
-fjson() {
-  fetch "$1" | jq -cre "$2"
-}
-
 # Now playing info
 info() {
   local arr sec i
 
-  read -ra arr < <(fjson nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
+  read -ra arr < <(query nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
     (.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
     .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
 
@@ -59,7 +54,7 @@ info() {
 # List or play items — <endpoint> <filter> <arg>
 play() {
   local data id nm names=() urls=()
-  data=$(fjson "$1" ".children[]|select($2)|[.name,.ussi]|@tsv")
+  data=$(query "$1" ".children[]|select($2)|[.name,.ussi]|@tsv")
 
   while read -r nm id; do
     names+=("$nm")
@@ -72,10 +67,15 @@ play() {
       printf '%d) %s\n' $((id++)) "$nm"
     done
   elif [[ $arg =~ ^[0-9]{1,2}$ ]] && ((arg > 0 && arg <= ${#urls[@]})); then
-    fetch "${urls[arg - 1]}?cmd=play"
+    call "${urls[arg - 1]}?cmd=play"
   else
     error 200
   fi
+}
+
+# JSON request — <endpoint> <filter>
+query() {
+  call "$1" | jq -cre "$2"
 }
 
 # Seek to position - <arg>
@@ -83,7 +83,7 @@ seek() {
   local -i dur pos val
 
   if [[ $arg =~ ^([+-]?)([0-9]{1,4})$ ]] && ((BASH_REMATCH[2] <= 3600)); then
-    read -r pos dur < <(fjson nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
+    read -r pos dur < <(query nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
     ((dur == 0)) && return
 
     val=${BASH_REMATCH[2]}
@@ -94,7 +94,7 @@ seek() {
     esac
 
     ((val = val < 0 ? 0 : val >= dur ? dur - 1 : val))
-    fetch "nowplaying?cmd=seek&position=$((val * 1000))"
+    call "nowplaying?cmd=seek&position=$((val * 1000))"
   else
     error 201
   fi
@@ -105,17 +105,17 @@ state() {
   local mod=${4:-2} val
 
   if [[ $3 == - ]]; then
-    fjson "$1" ".\"$2\"//empty"
+    query "$1" ".\"$2\"//empty"
     return
   elif [[ -z $3 ]]; then
-    val=$(fjson "$1" ".$2|(tonumber+1)%$mod")
+    val=$(query "$1" ".$2|(tonumber+1)%$mod")
   elif [[ $3 =~ ^[0-9]$ && $3 -lt $mod ]]; then
     val=$3
   else
     error 200
   fi
 
-  fetch "$1?$2=$val" PUT
+  call "$1?$2=$val" PUT
 }
 
 # Usage instructions
@@ -166,10 +166,10 @@ esac
 # Main option handler
 case $opt in
 standby)
-  fetch power?system=lona PUT
+  call power?system=lona PUT
   ;;
 wake)
-  fetch power?system=on PUT
+  call power?system=on PUT
   ;;
 inputs)
   play inputs '.disabled=="0"'
@@ -178,7 +178,7 @@ presets)
   play favourites?sort=D:presetID .stationKey!=null
   ;;
 next | play | playpause | prev | stop)
-  fetch "nowplaying?cmd=$opt"
+  call "nowplaying?cmd=$opt"
   ;;
 seek)
   seek "$arg"
@@ -190,10 +190,10 @@ repeat)
   state nowplaying repeat "$arg" 3
   ;;
 clear)
-  fetch inputs/playqueue?clear=true POST
+  call inputs/playqueue?clear=true POST
   ;;
 playqueue)
-  fjson inputs/playqueue '.children[]?|"\(.artistName//"?") / \(.name) [\(.albumName//"?")]"' || true
+  query inputs/playqueue '.children[]?|"\(.artistName//"?") / \(.name) [\(.albumName//"?")]"' || true
   ;;
 loudness | mono)
   state outputs "$opt" "$arg"
@@ -203,10 +203,10 @@ mute)
   ;;
 volume)
   if [[ $arg == - ]]; then
-    fjson levels '."volume"//empty'
+    query levels '."volume"//empty'
   elif [[ $arg =~ ^([+-]?)([0-9]{1,3})$ ]] && ((BASH_REMATCH[2] <= 100)); then
-    [[ -n ${BASH_REMATCH[1]} ]] && arg=$(fjson levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
-    fetch "levels?volume=$arg" PUT
+    [[ -n ${BASH_REMATCH[1]} ]] && arg=$(query levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
+    call "levels?volume=$arg" PUT
   else
     error 201
   fi
@@ -222,9 +222,9 @@ info)
   ;;
 system/capabilities | levels | network | nowplaying | outputs | power | system | update)
   if [[ -z $arg ]]; then
-    fjson "$opt" 'to_entries[5:][]|select(.key!="cpu"and.key!="children")|"\(.key)=\(.value)"'
+    query "$opt" 'to_entries[5:][]|select(.key!="cpu"and.key!="children")|"\(.key)=\(.value)"'
   elif [[ $arg =~ ^[[:alnum:]]{3,24}$ ]]; then
-    fjson "$opt" ".\"$arg\"//empty" || true
+    query "$opt" ".\"$arg\"//empty" || true
   else
     error 200
   fi
