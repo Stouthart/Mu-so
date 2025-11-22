@@ -18,6 +18,7 @@ call() {
   curl -fs --retry 1 -m2 -o"$out" -H'User-Agent:' -X"${2:-GET}" --http1.1 --tcp-nodelay "$BASE/$1" || error $?
 }
 
+# Print error and return
 error() {
   local msg
 
@@ -61,13 +62,13 @@ play() {
     urls+=("$id")
   done <<<"$data"
 
-  if [[ -z $arg ]]; then
+  if [[ -z $3 ]]; then
     id=1
     for nm in "${names[@]}"; do
       printf '%d) %s\n' $((id++)) "$nm"
     done
-  elif [[ $arg =~ ^[0-9]{1,2}$ ]] && ((arg > 0 && arg <= ${#urls[@]})); then
-    call "${urls[arg - 1]}?cmd=play"
+  elif [[ $3 =~ ^[0-9]{1,2}$ ]] && (($3 > 0 && $3 <= ${#urls[@]})); then
+    call "${urls[$3 - 1]}?cmd=play"
   else
     error 200
   fi
@@ -82,7 +83,7 @@ query() {
 seek() {
   local -i dur pos val
 
-  if [[ $arg =~ ^([+-]?)([0-9]{1,4})$ ]] && ((BASH_REMATCH[2] <= 3600)); then
+  if [[ $1 =~ ^([+-]?)([0-9]{1,4})$ ]] && ((BASH_REMATCH[2] <= 3600)); then
     read -r pos dur < <(query nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
     ((dur == 0)) && return
 
@@ -100,7 +101,7 @@ seek() {
   fi
 }
 
-# Get, toggle, or set state — <endpoint> <setting> <arg> [mod]
+# Get, toggle or set state — <endpoint> <setting> <arg> [mod]
 state() {
   local mod=${4:-2} val
 
@@ -163,7 +164,7 @@ queue) opt=playqueue ;;
 vol) opt=volume ;;
 esac
 
-# Main option handler
+# Main dispatcher
 case $opt in
 standby)
   call power?system=lona PUT
@@ -172,10 +173,10 @@ wake)
   call power?system=on PUT
   ;;
 inputs)
-  play inputs '.disabled=="0"'
+  play inputs '.disabled=="0"' "$arg"
   ;;
 presets)
-  play favourites?sort=D:presetID .stationKey!=null
+  play favourites?sort=D:presetID .stationKey!=null "$arg"
   ;;
 next | play | playpause | prev | stop)
   call "nowplaying?cmd=$opt"
