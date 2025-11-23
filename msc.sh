@@ -51,7 +51,7 @@ info() {
   printf '%s / %s [%s]\n%s / %s - %s %skHz %sbit %skb/s [%s]\n' "${arr[@]}"
 }
 
-# List or play items — <endpoint> <filter> <arg>
+# List or play items — <ussi> <filter> <arg>
 play() {
   local data id nm names=() urls=()
   data=$(query "$1" ".children[]|select($2)|[.name,.ussi]|@tsv")
@@ -73,7 +73,7 @@ play() {
   fi
 }
 
-# JSON request — <endpoint> <filter>
+# JSON request — <ussi> <filter>
 query() {
   call "$1" | jq -cre "$2"
 }
@@ -100,7 +100,7 @@ seek() {
   fi
 }
 
-# Get, toggle or set state — <endpoint> <setting> <arg> [mod]
+# Get, toggle, or set state — <ussi> <key> <arg> [mod]
 state() {
   local mod=${4:-2} val
 
@@ -121,7 +121,7 @@ state() {
 # Usage instructions
 usage() {
   cat <<EOF
-${0##*/} v5.0 - Control Naim Mu-so 2 over HTTP
+${0##*/} v5.1 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2025 Stouthart. All rights reserved.
 
 Usage: ${0##*/} <option> [argument]
@@ -147,18 +147,19 @@ Other:
 
 Information:
   capabilities | levels | network | nowplaying
-  outputs | power | system | update
+  outputs | power | poweramp | system | update
 EOF
 }
 
 opt=${1-}
 arg=${2-}
 
-# Option aliases
+# Option mappings
 case $opt in
 capabilities) opt=system/capabilities ;;
 lighting) opt=lightTheme ;;
 pause) opt=playpause ;;
+poweramp) opt=outputs/poweramp ;;
 queue) opt=playqueue ;;
 vol) opt=volume ;;
 esac
@@ -220,7 +221,7 @@ position)
 info)
   info
   ;;
-system/capabilities | levels | network | nowplaying | outputs | power | system | update)
+system/capabilities | levels | network | nowplaying | outputs | power | outputs/poweramp | system | update)
   if [[ -z $arg ]]; then
     query "$opt" 'to_entries[5:][]|select(.key!="cpu"and.key!="children")|"\(.key)=\(.value)"'
   elif [[ $arg =~ ^[[:alnum:]]{3,24}$ ]]; then
