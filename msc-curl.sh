@@ -117,7 +117,8 @@ seek() {
 
 # Numeric, optionally signed? — <arg> <max>
 signed() {
-  [[ $1 =~ ^([+-]?)([0-9]{1,4})$ && ${BASH_REMATCH[2]} -le $2 ]] || return 1
+  [[ $1 =~ ^([+-]?)([0-9]{1,4})$ ]] || return 1
+  ((BASH_REMATCH[2] <= $2))
 }
 
 # Get, toggle, or set state — <ussi> <key> <arg> [mod]
