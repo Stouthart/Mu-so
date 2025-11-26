@@ -15,7 +15,7 @@ BASE="http://${MUSO_IP:-mu-so}:15081"
 call() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
-  curl -fs --retry 1 -m2 -o"$out" -H'User-Agent:' -X"${2:-GET}" --http1.1 --tcp-nodelay "$BASE/$1" || error $?
+  curl -fs --retry 1 -m2 -o "$out" -H'User-Agent:' -X"${2:-GET}" --http1.1 --tcp-nodelay "$BASE/$1" || error $?
 }
 
 # Print error and return
@@ -36,7 +36,7 @@ error() {
   return "$1"
 }
 
-# Now playing info
+# Show now playing info
 info() {
   local arr sec i
 
@@ -50,6 +50,20 @@ info() {
   done
 
   printf '%s / %s [%s]\n%s / %s - %s %skHz %sbit %skb/s [%s]\n' "${arr[@]}"
+}
+
+# Get or set numeric value <ussi> <key> <arg> [max]
+number() {
+  local max=${4:-100} val
+
+  if [[ $3 == - ]]; then
+    value "$1" "$2"
+  elif signed "$3" "$max"; then
+    [[ -z ${BASH_REMATCH[1]} ]] && val=$3 || val=$(query "$1" "[.$2|tonumber${BASH_REMATCH[0]},0,$max]|sort|.[1]")
+    call "$1?$2=$val" PUT
+  else
+    error 201
+  fi
 }
 
 # List or play items — <ussi> <filter> <arg>
@@ -83,7 +97,7 @@ query() {
 seek() {
   local -i dur pos val
 
-  if [[ $1 =~ ^([+-]?)([0-9]{1,4})$ ]] && ((BASH_REMATCH[2] <= 3600)); then
+  if signed "$1" 3600; then
     read -r pos dur < <(query nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
     ((dur == 0)) && return
 
@@ -101,12 +115,17 @@ seek() {
   fi
 }
 
+# Numeric, optionally signed? — <arg> <max>
+signed() {
+  [[ $1 =~ ^([+-]?)([0-9]{1,4})$ && ${BASH_REMATCH[2]} -le $2 ]] || return 1
+}
+
 # Get, toggle, or set state — <ussi> <key> <arg> [mod]
 state() {
   local mod=${4:-2} val
 
   if [[ $3 == - ]]; then
-    query "$1" ".\"$2\"//empty"
+    value "$1" "$2"
     return
   elif [[ -z $3 ]]; then
     val=$(query "$1" ".$2|(tonumber+1)%$mod")
@@ -119,10 +138,15 @@ state() {
   call "$1?$2=$val" PUT
 }
 
+# Get single JSON value — <ussi> <key>
+value() {
+  query "$1" ".\"$2\"//empty"
+}
+
 # Usage instructions
 usage() {
   cat <<EOF
-${0##*/} v5.1 - Control Naim Mu-so 2 over HTTP
+${0##*/} v5.2 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2025 Stouthart. All rights reserved.
 
 Usage: ${0##*/} <option> [argument]
@@ -131,7 +155,7 @@ Power:
   standby | wake
 
 Inputs:
-  inputs | presets
+  inputs | radio
 
 Playback:
   next | pause | play | prev | stop
@@ -144,7 +168,7 @@ Audio:
   loudness | mono | mute | volume <0..100>
 
 Other:
-  lighting <0..2> | position <0..2>
+  lighting | max | position | timeout <0..120>
 
 Information:
   capabilities | levels | network | nowplaying
@@ -155,13 +179,15 @@ EOF
 opt=${1-}
 arg=${2-}
 
-# Option mappings
+# Option aliases
 case $opt in
 capabilities) opt=system/capabilities ;;
 lighting) opt=lightTheme ;;
+max) opt=maxVolume ;;
 pause) opt=playpause ;;
 poweramp) opt=outputs/poweramp ;;
 queue) opt=playqueue ;;
+timeout) opt=standbyTimeout ;;
 vol) opt=volume ;;
 esac
 
@@ -176,7 +202,7 @@ wake)
 inputs)
   play inputs '.disabled=="0"' "$arg"
   ;;
-presets)
+radio)
   play favourites?sort=D:presetID .stationKey!=null "$arg"
   ;;
 next | play | playpause | prev | stop)
@@ -204,20 +230,19 @@ mute)
   state levels mute "$arg"
   ;;
 volume)
-  if [[ $arg == - ]]; then
-    query levels '."volume"//empty'
-  elif [[ $arg =~ ^([+-]?)([0-9]{1,3})$ ]] && ((BASH_REMATCH[2] <= 100)); then
-    [[ -n ${BASH_REMATCH[1]} ]] && arg=$(query levels "[.volume|tonumber${BASH_REMATCH[0]},0,100]|sort|.[1]")
-    call "levels?volume=$arg" PUT
-  else
-    error 201
-  fi
+  number levels volume "$arg"
   ;;
 lightTheme)
   state userinterface lightTheme "$arg" 3
   ;;
+maxVolume)
+  number outputs/poweramp maxVolume "$arg"
+  ;;
 position)
   state outputs position "$arg" 3
+  ;;
+standbyTimeout)
+  number power standbyTimeout "$arg" 120
   ;;
 info)
   info
@@ -226,7 +251,7 @@ system/capabilities | levels | network | nowplaying | outputs | power | outputs/
   if [[ -z $arg ]]; then
     query "$opt" 'to_entries[5:][]|select(.key!="cpu"and.key!="children")|"\(.key)=\(.value)"'
   elif [[ $arg =~ ^[[:alnum:]]{3,24}$ ]]; then
-    query "$opt" ".\"$arg\"//empty" || true
+    value "$opt" "$arg" || true
   else
     error 200
   fi
