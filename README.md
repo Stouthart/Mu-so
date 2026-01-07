@@ -1,3 +1,3 @@
-<!-- v3.1 - Copyright © 2025 Stouthart. All rights reserved. -->
+<!-- v5.3 - Copyright © 2026 Stouthart. All rights reserved. -->
 
-# Control Naim Mu-so (2nd generation) over HTTP
+# Control Naim Mu-so 2nd generation over HTTP

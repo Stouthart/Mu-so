@@ -15,7 +15,7 @@ BASE="http://${MUSO_IP:-mu-so}:15081"
 call() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
-  wget -qt1 -T2 -O "$out" -U '' --method="${2:-GET}" "$BASE/$1" || error $?
+  wget -qt1 -T2 -O"$out" -U '' --method="${2:-GET}" "$BASE/$1" || error $?
 }
 
 # Print error and return
@@ -51,7 +51,7 @@ info() {
   printf '%s / %s [%s]\n%s / %s - %s %skHz %sbit %skb/s [%s]\n' "${arr[@]}"
 }
 
-# Get or set numeric value <ussi> <key> <arg> [max]
+# Get or set numeric value - <ussi> <key> <arg> [max]
 number() {
   local max=${4:-100} val
 
@@ -94,9 +94,9 @@ query() {
 
 # Seek to position - <arg>
 seek() {
-  local -i dur pos val
-
   if signed "$1" 3600; then
+    local -i dur pos val
+
     read -r pos dur < <(query nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
     ((dur == 0)) && return
 
@@ -146,8 +146,8 @@ value() {
 # Usage instructions
 usage() {
   cat <<EOF
-${0##*/} v5.2 - Control Naim Mu-so 2 over HTTP
-Copyright (C) 2025 Stouthart. All rights reserved.
+${0##*/} v5.3 - Control Naim Mu-so 2 over HTTP
+Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: ${0##*/} <option> [argument]
 
