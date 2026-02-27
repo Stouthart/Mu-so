@@ -25,9 +25,8 @@ error() {
   case $1 in
   4) msg='Network failure.' ;;
   8) msg='Error, Mu-so in standby?' ;;
-  200) msg='Invalid argument.' ;;
-  201) msg='Missing or invalid argument.' ;;
-  202) msg='Missing or invalid option.' ;;
+  200) msg='Missing or invalid argument.' ;;
+  201) msg='Missing or invalid option.' ;;
   *) msg="(wget) error $1." ;;
   esac
 
@@ -55,13 +54,13 @@ info() {
 number() {
   local max=${4:-100} val
 
-  if [[ $3 == - ]]; then
+  if [[ -z $3 ]]; then
     value "$1" "$2"
   elif signed "$3" "$max"; then
     [[ -z ${BASH_REMATCH[1]} ]] && val=$3 || val=$(query "$1" "[.$2|tonumber${BASH_REMATCH[0]},0,$max]|sort|.[1]")
     call "$1?$2=$val" PUT
   else
-    error 201
+    error 200
   fi
 }
 
@@ -110,7 +109,7 @@ seek() {
     ((val = val < 0 ? 0 : val >= dur ? dur - 1 : val))
     call "nowplaying?cmd=seek&position=$((val * 1000))"
   else
-    error 201
+    error 200
   fi
 }
 
@@ -146,7 +145,7 @@ value() {
 # Usage instructions
 usage() {
   cat <<EOF
-${0##*/} v5.3 - Control Naim Mu-so 2 over HTTP
+${0##*/} v5.4 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: ${0##*/} <option> [argument]
@@ -260,7 +259,7 @@ help)
   usage
   ;;
 *)
-  error 202
+  error 201
   ;;
 esac
 
