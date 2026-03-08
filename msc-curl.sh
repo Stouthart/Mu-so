@@ -51,14 +51,14 @@ info() {
   printf '%s / %s [%s]\n%s / %s - %s %skHz %sbit %skb/s [%s]\n' "${arr[@]}"
 }
 
-# Get or set numeric value - <ussi> <key> <arg> [max]
+# Get or set numeric value - <ussi> <key> <arg> <max>
 number() {
-  local max=${4:-100} val
+  local val
 
   if [[ -z $3 ]]; then
     value "$1" "$2"
-  elif signed "$3" "$max"; then
-    [[ -z ${BASH_REMATCH[1]} ]] && val=$3 || val=$(query "$1" "[.$2|tonumber${BASH_REMATCH[0]},0,$max]|sort|.[1]")
+  elif signed "$3" "$4"; then
+    [[ -z ${BASH_REMATCH[1]} ]] && val=$3 || val=$(query "$1" "[.$2|tonumber${BASH_REMATCH[0]},0,$4]|sort|.[1]")
     call "$1?$2=$val" PUT
   else
     error 200
@@ -212,13 +212,13 @@ mute)
   number levels mute "$arg" 1
   ;;
 volume)
-  number levels volume "$arg"
+  number levels volume "$arg" 100
   ;;
 lightTheme)
   number userinterface lightTheme "$arg" 2
   ;;
 maxVolume)
-  number outputs/poweramp maxVolume "$arg"
+  number outputs/poweramp maxVolume "$arg" 100
   ;;
 position)
   number outputs position "$arg" 2
