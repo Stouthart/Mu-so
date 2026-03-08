@@ -120,20 +120,6 @@ signed() {
   ((BASH_REMATCH[2] <= $2))
 }
 
-# Get or set state — <ussi> <key> <arg> [mod]
-state() {
-  local mod=${4:-2} val
-
-  if [[ -z $3 ]]; then
-    value "$1" "$2"
-  elif [[ $3 =~ ^[0-9]$ && $3 -lt $mod ]]; then
-    val=$3
-    call "$1?$2=$val" PUT
-  else
-    error 200
-  fi
-}
-
 # Get single JSON value — <ussi> <key>
 value() {
   query "$1" ".\"$2\"//empty"
@@ -208,10 +194,10 @@ seek)
   seek "$arg"
   ;;
 shuffle)
-  state nowplaying shuffle "$arg"
+  number nowplaying shuffle "$arg" 1
   ;;
 repeat)
-  state nowplaying repeat "$arg" 3
+  number nowplaying repeat "$arg" 2
   ;;
 clear)
   call inputs/playqueue?clear=true POST
@@ -220,22 +206,22 @@ playqueue)
   query inputs/playqueue '.children[]?|"\(.artistName//"?") / \(.name) [\(.albumName//"?")]"' || true
   ;;
 loudness | mono)
-  state outputs "$opt" "$arg"
+  number outputs "$opt" "$arg" 1
   ;;
 mute)
-  state levels mute "$arg"
+  number levels mute "$arg" 1
   ;;
 volume)
   number levels volume "$arg"
   ;;
 lightTheme)
-  state userinterface lightTheme "$arg" 3
+  number userinterface lightTheme "$arg" 2
   ;;
 maxVolume)
   number outputs/poweramp maxVolume "$arg"
   ;;
 position)
-  state outputs position "$arg" 3
+  number outputs position "$arg" 2
   ;;
 standbyTimeout)
   number power standbyTimeout "$arg" 120
