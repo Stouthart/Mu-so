@@ -120,22 +120,18 @@ signed() {
   ((BASH_REMATCH[2] <= $2))
 }
 
-# Get, toggle, or set state — <ussi> <key> <arg> [mod]
+# Get or set state — <ussi> <key> <arg> [mod]
 state() {
   local mod=${4:-2} val
 
-  if [[ $3 == - ]]; then
+  if [[ -z $3 ]]; then
     value "$1" "$2"
-    return
-  elif [[ -z $3 ]]; then
-    val=$(query "$1" ".$2|(tonumber+1)%$mod")
   elif [[ $3 =~ ^[0-9]$ && $3 -lt $mod ]]; then
     val=$3
+    call "$1?$2=$val" PUT
   else
     error 200
   fi
-
-  call "$1?$2=$val" PUT
 }
 
 # Get single JSON value — <ussi> <key>
@@ -146,7 +142,7 @@ value() {
 # Usage instructions
 usage() {
   cat <<EOF
-${0##*/} v5.4 - Control Naim Mu-so 2 over HTTP
+${0##*/} v5.5 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: ${0##*/} <option> [argument]
