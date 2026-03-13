@@ -51,22 +51,8 @@ info() {
   printf '%s / %s [%s]\n%s / %s - %s %skHz %sbit %skb/s [%s]\n' "${arr[@]}"
 }
 
-# Get or set numeric value - <ussi> <key> <arg> <max>
-number() {
-  local val
-
-  if [[ -z $3 ]]; then
-    value "$1" "$2"
-  elif signed "$3" "$4"; then
-    [[ -z ${BASH_REMATCH[1]} ]] && val=$3 || val=$(query "$1" "[.$2|tonumber${BASH_REMATCH[0]},0,$4]|sort|.[1]")
-    call "$1?$2=$val" PUT
-  else
-    error 200
-  fi
-}
-
 # List or play items — <ussi> <filter> <arg>
-play() {
+list() {
   local data id nm names=() urls=()
   data=$(query "$1" ".children[]|select($2)|[.name,.ussi]|@tsv")
 
@@ -85,6 +71,25 @@ play() {
   else
     error 200
   fi
+}
+
+# Get or set numeric value - <ussi> <key> <arg> <max>
+number() {
+  local val
+
+  if [[ -z $3 ]]; then
+    value "$1" "$2"
+  elif signed "$3" "$4"; then
+    [[ -z ${BASH_REMATCH[1]} ]] && val=$3 || val=$(query "$1" "[.$2|tonumber${BASH_REMATCH[0]},0,$4]|sort|.[1]")
+    call "$1?$2=$val" PUT
+  else
+    error 200
+  fi
+}
+
+# Play input - <ussi>
+play() {
+  call "$1?cmd=play"
 }
 
 # JSON request — <ussi> <filter>
@@ -128,7 +133,7 @@ value() {
 # Usage instructions
 usage() {
   cat <<EOF
-${0##*/} v5.5 - Control Naim Mu-so 2 over HTTP
+${0##*/} v6.0 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: ${0##*/} <option> [argument]
@@ -137,7 +142,7 @@ Power:
   standby | wake
 
 Inputs:
-  inputs | radio
+  inputs | stations
 
 Playback:
   next | pause | play | prev | stop
@@ -169,6 +174,7 @@ max) opt=maxVolume ;;
 pause) opt=playpause ;;
 poweramp) opt=outputs/poweramp ;;
 queue) opt=playqueue ;;
+radio) opt=stations ;;
 timeout) opt=standbyTimeout ;;
 vol) opt=volume ;;
 esac
@@ -182,10 +188,13 @@ wake)
   call power?system=on PUT
   ;;
 inputs)
-  play inputs '.disabled=="0"' "$arg"
+  list inputs '.disabled=="0"' "$arg"
   ;;
-radio)
-  play favourites?sort=D:presetID .stationKey!=null "$arg"
+stations)
+  list favourites?sort=D:presetID .stationKey!=null "$arg"
+  ;;
+qobuz | spotify | tidal)
+  play "inputs/$opt"
   ;;
 next | play | playpause | prev | stop)
   call "nowplaying?cmd=$opt"
