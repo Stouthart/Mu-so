@@ -53,7 +53,7 @@ info() {
 
 # List or play items — <ussi> <filter> <arg>
 list() {
-  local data id nm names=() urls=()
+  local data id=1 nm names=() urls=()
   data=$(query "$1" ".children[]|select($2)|[.name,.ussi]|@tsv")
 
   while read -r nm id; do
@@ -62,12 +62,9 @@ list() {
   done <<<"$data"
 
   if [[ -z $3 ]]; then
-    id=1
-    for nm in "${names[@]}"; do
-      printf '%d) %s\n' $((id++)) "$nm"
-    done
+    for nm in "${names[@]}"; do printf '%d) %s\n' $((id++)) "$nm"; done
   elif [[ $3 =~ ^[0-9]{1,2}$ ]] && (($3 > 0 && $3 <= ${#urls[@]})); then
-    call "${urls[$3 - 1]}?cmd=play"
+    call "${urls[$3-1]}?cmd=play"
   else
     error 200
   fi
@@ -87,7 +84,7 @@ number() {
   fi
 }
 
-# Play input - <ussi>
+# Play item - <ussi>
 play() {
   call "$1?cmd=play"
 }
@@ -133,7 +130,7 @@ value() {
 # Usage instructions
 usage() {
   cat <<EOF
-${0##*/} v6.0 - Control Naim Mu-so 2 over HTTP
+${0##*/} v6.1 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: ${0##*/} <option> [argument]
