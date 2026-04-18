@@ -47,16 +47,16 @@ info() {
     arr[i]=$((arr[i] / 60000)):$sec
   done
 
-  printf '%s / %s [%s]\n%s / %s - %s %skHz %sbit %skb/s [%s]\n' "${arr[@]}"
+  printf '%s / %s [%s]\n%s / %s - %s %skHz %dbit %dkb/s [%s]\n' "${arr[@]}"
 }
 
 # List or play items — <ussi> <filter> <arg>
 list() {
-  local id=1 nm names=() urls=()
+  local id=1 nm names=() urls=() ussi
 
-  while read -r nm id; do
+  while read -r nm ussi; do
     names+=("$nm")
-    urls+=("$id")
+    urls+=("$ussi")
   done < <(query "$1" ".children[]|select($2)|[.name,.ussi]|@tsv")
 
   if [[ -z $3 ]]; then
