@@ -71,11 +71,11 @@ list() {
 
 # Get or set numeric value - <ussi> <key> <arg> <max>
 number() {
-  local val
-
   if [[ -z $3 ]]; then
     value "$1" "$2"
   elif signed "$3" "$4"; then
+    local val
+
     [[ -z ${BASH_REMATCH[1]} ]] && val=$3 || val=$(query "$1" "[.$2|tonumber${BASH_REMATCH[0]},0,$4]|sort|.[1]")
     call "$1?$2=$val" PUT
   else
@@ -128,11 +128,13 @@ value() {
 
 # Usage instructions
 usage() {
+  local nm=${0##*/}
+
   cat <<EOF
-${0##*/} v6.2 - Control Naim Mu-so 2 over HTTP
+$nm v6.3 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
-Usage: ${0##*/} <option> [argument]
+Usage: $nm <option> [argument]
 
 Power:
   standby | wake
