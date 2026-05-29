@@ -39,8 +39,8 @@ error() {
 info() {
   local arr sec i
 
-  read -ra arr < <(query nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,.codec,
-    (.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
+  read -ra arr < <(query nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,
+    .codec,(.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
     .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
 
   for i in 3 4; do
@@ -131,20 +131,20 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v6.4 - Control Naim Mu-so 2 over HTTP
+$nm v7.0 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
 
 Power:
-  standby | wake
+  sleep | wake
 
 Inputs:
   inputs | stations
 
 Playback:
-  info | next | pause | play | prev
-  stop | seek <sec> | shuffle | repeat
+  next | pause | play | prev | stop
+  seek <sec> | shuffle | repeat
 
 Playqueue:
   clear | queue
@@ -167,19 +167,14 @@ arg=${2-}
 # Option aliases
 case $opt in
 capabilities) opt=system/capabilities ;;
-lighting) opt=lightTheme ;;
-max) opt=maxVolume ;;
 pause) opt=playpause ;;
 poweramp) opt=outputs/poweramp ;;
-queue) opt=playqueue ;;
-radio) opt=stations ;;
 timeout) opt=standbyTimeout ;;
-vol) opt=volume ;;
 esac
 
 # Main dispatcher
 case $opt in
-standby)
+sleep | standby)
   call power?system=lona PUT
   ;;
 wake)
@@ -188,7 +183,7 @@ wake)
 inputs)
   list inputs '.disabled=="0"' "$arg"
   ;;
-stations)
+radio | stations)
   list favourites?sort=D:presetID .stationKey!=null "$arg"
   ;;
 qobuz | spotify | tidal)
@@ -209,7 +204,7 @@ repeat)
 clear)
   call inputs/playqueue?clear=true POST
   ;;
-playqueue)
+queue | playqueue)
   query inputs/playqueue '.children[]?|"\(.artistName//"?") / \(.name) [\(.albumName//"?")]"' || true
   ;;
 loudness | mono)
@@ -218,19 +213,19 @@ loudness | mono)
 mute)
   number levels mute "$arg" 1
   ;;
-volume)
+volume | vol)
   number levels volume "$arg" 100
   ;;
-lightTheme)
+lighting | lightTheme)
   number userinterface lightTheme "$arg" 2
   ;;
-maxVolume)
+max | maxVolume)
   number outputs/poweramp maxVolume "$arg" 100
   ;;
 position)
   number outputs position "$arg" 2
   ;;
-standbyTimeout)
+timeout | standbyTimeout)
   number power standbyTimeout "$arg" 120
   ;;
 info)
