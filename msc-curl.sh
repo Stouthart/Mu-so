@@ -131,7 +131,7 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v6.3 - Control Naim Mu-so 2 over HTTP
+$nm v6.4 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -143,8 +143,8 @@ Inputs:
   inputs | stations
 
 Playback:
-  next | pause | play | prev | stop
-  seek <sec> | shuffle | repeat
+  info | next | pause | play | prev
+  stop | seek <sec> | shuffle | repeat
 
 Playqueue:
   clear | queue

@@ -15,7 +15,7 @@ BASE="http://${MUSO_IP:-mu-so}:15081"
 call() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
-  wget -qT2 -O "$out" -U '' --method="${2:-GET}" "$BASE/$1" || error $?
+  wget -qt1 -T2 -O "$out" -U '' --method="${2:-GET}" "$BASE/$1" || error $?
 }
 
 # Print error and return
@@ -130,7 +130,7 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v6.3 - Control Naim Mu-so 2 over HTTP
+$nm v6.4 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -142,8 +142,8 @@ Inputs:
   inputs | stations
 
 Playback:
-  next | pause | play | prev | stop
-  seek <sec> | shuffle | repeat
+  info | next | pause | play | prev
+  stop | seek <sec> | shuffle | repeat
 
 Playqueue:
   clear | queue
