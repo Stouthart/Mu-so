@@ -84,24 +84,18 @@ number() {
 }
 
 # Play item - <ussi>
-play() {
-  call "$1?cmd=play"
-}
+play() { call "$1?cmd=play"; }
 
 # JSON request — <ussi> <filter>
-query() {
-  call "$1" | jq -cre "$2"
-}
+query() { call "$1" | jq -cre "$2"; }
 
 # Seek to position - <arg>
 seek() {
   if signed "$1" 3600; then
-    local -i dur pos val
+    local -i dur pos val=$((BASH_REMATCH[2] * 1000))
 
-    read -r pos dur < <(query nowplaying '[.transportPosition,.duration]|map((.//0|tonumber/1000|round))|@tsv')
+    read -r pos dur < <(query nowplaying '[.transportPosition//0,.duration//0]|@tsv')
     ((dur == 0)) && return
-
-    val=${BASH_REMATCH[2]}
 
     case ${BASH_REMATCH[1]} in
     +) ((val += pos)) ;;
@@ -109,7 +103,7 @@ seek() {
     esac
 
     ((val = val < 0 ? 0 : val >= dur ? dur - 1 : val))
-    call "nowplaying?cmd=seek&position=$((val * 1000))"
+    call "nowplaying?cmd=seek&position=$val"
   else
     error 200
   fi
@@ -122,16 +116,14 @@ signed() {
 }
 
 # Get single JSON value — <ussi> <key>
-value() {
-  query "$1" ".\"$2\"//empty"
-}
+value() { query "$1" ".\"$2\"//empty"; }
 
 # Usage instructions
 usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v7.0 - Control Naim Mu-so 2 over HTTP
+$nm v7.1 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -169,7 +161,6 @@ case $opt in
 capabilities) opt=system/capabilities ;;
 pause) opt=playpause ;;
 poweramp) opt=outputs/poweramp ;;
-timeout) opt=standbyTimeout ;;
 esac
 
 # Main dispatcher
@@ -213,7 +204,7 @@ loudness | mono)
 mute)
   number levels mute "$arg" 1
   ;;
-volume | vol)
+vol | volume)
   number levels volume "$arg" 100
   ;;
 lighting | lightTheme)
