@@ -15,7 +15,7 @@ BASE="http://${MUSO_IP:-mu-so}:15081"
 call() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
-  curl -fs --retry 1 -m2 -o "$out" -H'User-Agent:' -X"${2:-GET}" --http1.1 --tcp-nodelay "$BASE/$1" || error $?
+  wget --no-config --no-proxy -4 -q -t1 -T2 -O "$out" -U '' --method="${2:-GET}" "$BASE/$1" || error $?
 }
 
 # Print error and return
@@ -23,12 +23,11 @@ error() {
   local msg
 
   case $1 in
-  6 | 7) msg='Network failure.' ;;
-  22) msg='Error, Mu-so in standby?' ;;
-  28) msg='Operation timeout.' ;;
+  4) msg='Network failure.' ;;
+  8) msg='Error, Mu-so in standby?' ;;
   200) msg='Missing or invalid argument.' ;;
   201) msg='Missing or invalid option.' ;;
-  *) msg="(curl) error $1." ;;
+  *) msg="(wget) error $1." ;;
   esac
 
   printf '%s\n' "$msg" >&2
@@ -87,7 +86,14 @@ number() {
 play() { call "$1?cmd=play"; }
 
 # JSON request — <ussi> <filter>
-query() { call "$1" | jq -cre "$2"; }
+query() {
+  set +e
+  call "$1" | jq -cre "$2"
+  local -a rc=("${PIPESTATUS[@]}")
+  set -e
+  ((rc[0])) && return "${rc[0]}"
+  return "${rc[1]}"
+}
 
 # Seek to position - <arg>
 seek() {
@@ -123,7 +129,7 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v7.1 - Control Naim Mu-so 2 over HTTP
+$nm v7.2 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -238,5 +244,3 @@ help)
   error 201
   ;;
 esac
-
-exit
