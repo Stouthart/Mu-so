@@ -241,3 +241,5 @@ help)
   error 201
   ;;
 esac
+
+exit
