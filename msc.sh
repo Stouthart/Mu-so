@@ -87,13 +87,9 @@ play() { call "$1?cmd=play"; }
 
 # JSON request — <ussi> <filter>
 query() {
-  set +e
-  call "$1" | jq -cre "$2"
-  local -a rc=("${PIPESTATUS[@]}")
-  set -e
-
-  ((rc[0])) && return "${rc[0]}"
-  return "${rc[1]}"
+  local json
+  json=$(call "$1")
+  jq -cre "$2" <<<"$json"
 }
 
 # Seek to position - <arg>
@@ -130,7 +126,7 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v7.2 - Control Naim Mu-so 2 over HTTP
+$nm v7.3 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
