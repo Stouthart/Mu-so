@@ -4,7 +4,7 @@ IFS=$'\n\t'
 
 [[ ${1-} == --xdbg ]] && { # Bash >= v5.0
   shift
-  PS4='+\e[4G\e[36m$(((${EPOCHREALTIME/./}-_ERT)/1000))\e[9G\e[33m$LINENO\e[13G\e[90m>\e[15G\e[m'
+  PS4='+\e[5G\e[36m$(((${EPOCHREALTIME/./}-_ERT)/1000))\e[9G\e[33m$LINENO\e[13G\e[90m>\e[15G\e[m'
   declare -ir _ERT=${EPOCHREALTIME/./}
   set -x
 }
