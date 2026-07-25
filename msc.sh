@@ -4,6 +4,7 @@ IFS=$'\n\t'
 
 [[ ${1-} == --xdbg ]] && { # Bash >= v5.0
   shift
+  declare +x LC_CTYPE=C
   PS4='+\e[5G\e[36m$(((${EPOCHREALTIME/./}-_ERT)/1000))\e[9G\e[33m$LINENO\e[13G\e[90m>\e[15G\e[m'
   declare -ir _ERT=${EPOCHREALTIME/./}
   set -x
@@ -38,9 +39,9 @@ error() {
 info() {
   local arr sec i
 
-  read -ra arr < <(query nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,
-    .codec,(.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
-    .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(.//"?")|@tsv')
+  read -ra arr < <(query nowplaying '[.artistName//"?",.title//"?",.albumName//"?",.transportPosition//0,.duration//0,
+    .codec//"?",(.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
+    .sourceDetail//(.source//"?"|sub("^inputs/";""))]|@tsv')
 
   for i in 3 4; do
     printf -v sec '%02d' $(((arr[i] / 1000) % 60))
@@ -74,7 +75,6 @@ number() {
     value "$1" "$2"
   elif signed "$3" "$4"; then
     local val
-
     [[ -z ${BASH_REMATCH[1]} ]] && val=$3 || val=$(query "$1" "[.$2|tonumber${BASH_REMATCH[0]},0,$4]|sort|.[1]")
     call "$1?$2=$val" PUT
   else
@@ -126,7 +126,7 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v7.3 - Control Naim Mu-so 2 over HTTP
+$nm v7.4 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
