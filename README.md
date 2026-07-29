@@ -2,7 +2,7 @@
 
 # Control Naim Mu-so 2nd generation over HTTP
 
-A small Bash script that controls a **Naim Mu-so 2** from the command line, over your local network. It talks to the speaker's built-in HTTP API on port `15081` — no app, no cloud, no account. Handy for shell aliases, Apple Shortcuts, Stream Deck buttons, Home Assistant `shell_command`s, or a cron job that puts the speaker to sleep at midnight.
+A small Bash script that controls a **Naim Mu-so 2** from the command line, over your local network. It talks to the speaker's built-in HTTP API on port `15081` — no app, no cloud, no account. Handy for shell aliases, Apple Shortcuts, Stream Deck buttons, Home Assistant `shell_command`, or a cron job that puts the speaker to sleep at midnight.
 
 Two interchangeable versions are included:
 
