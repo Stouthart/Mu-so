@@ -15,18 +15,20 @@ BASE="http://${MUSO_IP:-mu-so}:15081"
 call() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
-  curl -q --noproxy '*' -4 -m2 -fso "$out" -HUser-Agent: -X"${2:-GET}" \
-    --http1.1 --tcp-nodelay --tcp-fastopen "$BASE/$1" || error $?
+  curl -q4fsm2 --noproxy '*' --http1.1 --tcp-fastopen \
+    -HUser-Agent: -X"${2:-GET}" -o "$out" "$BASE/$1" || error $?
 }
 
 # Print error and exit - <code>
 error() {
   case $1 in
-  6 | 7) echo 'Network failure.' ;;
-  22) echo 'Error, Mu-so in standby?' ;;
+  1) echo 'Invalid response from Mu-so.' ;;
+  6 | 7 | 52 | 56) echo 'Network failure, Mu-so offline?' ;;
+  22) echo 'Server error, Mu-so in standby?' ;;
   28) echo 'Operation timeout.' ;;
   200) echo 'Missing or invalid argument.' ;;
   201) echo 'Missing or invalid option.' ;;
+  202) echo 'Invalid response from Mu-so.' ;;
   *) echo "Unexpected curl error $1." ;;
   esac >&2
 
@@ -84,7 +86,10 @@ query() {
   call "$1" | jq -cre "$2" || {
     set -- "${PIPESTATUS[@]}"
     (($1 == 0)) || exit "$1"
-    return "$2"
+
+    case $2 in 2 | 3 | 5) error 202 ;;
+    *) return "$2" ;;
+    esac
   }
 }
 

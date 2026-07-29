@@ -215,14 +215,15 @@ sudo apt install jq
 
 ## Exit codes
 
-| Code                         | Meaning                                            |
-| ---------------------------- | -------------------------------------------------- |
-| `0`                          | Success                                            |
-| `4` (wget) / `6`, `7` (curl) | Network failure — speaker offline or wrong address |
-| `8` (wget) / `22` (curl)     | Server error — the speaker is probably in standby  |
-| `28`                         | Operation timed out (curl only)                    |
-| `200`                        | Missing or invalid argument                        |
-| `201`                        | Missing or invalid option                          |
+| Code                                     | Meaning                                              |
+| ---------------------------------------- | ---------------------------------------------------- |
+| `0`                                      | Success                                              |
+| `4` (wget) / `6`, `7`, `52`, `56` (curl) | Network failure — speaker offline or wrong address   |
+| `8` (wget) / `22` (curl)                 | Server error — the speaker is probably in standby    |
+| `28`                                     | Operation timed out (curl only)                      |
+| `200`                                    | Missing or invalid argument                          |
+| `201`                                    | Missing or invalid option                            |
+| `202` / `1` (curl)                       | The speaker returned something that isn't valid JSON |
 
 ## Debugging
 

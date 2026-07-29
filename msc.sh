@@ -26,6 +26,7 @@ error() {
   8) echo 'Server error, Mu-so in standby?' ;;
   200) echo 'Missing or invalid argument.' ;;
   201) echo 'Missing or invalid option.' ;;
+  202) echo 'Invalid response from Mu-so.' ;;
   *) echo "Unexpected wget error $1." ;;
   esac >&2
 
@@ -83,7 +84,10 @@ query() {
   call "$1" | jq -cre "$2" || {
     set -- "${PIPESTATUS[@]}"
     (($1 == 0)) || exit "$1"
-    return "$2"
+
+    case $2 in 2 | 3 | 5) error 202 ;;
+    *) return "$2" ;;
+    esac
   }
 }
 

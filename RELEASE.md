@@ -9,7 +9,8 @@ Highlights per major version, newest first. Point releases are listed where they
 Error handling done right, plus a friendlier first run.
 
 - Any failure now stops the script immediately and exits with a meaningful code. Errors no longer slip through, and messages are no longer printed twice.
-- Clearer diagnostics: an unreachable speaker ("Mu-so offline?") is now distinguished from one in standby ("Mu-so in standby?").
+- Clearer diagnostics in both versions: an unreachable speaker ("Mu-so offline?") is now distinguished from one in standby ("Mu-so in standby?"). A connection the speaker drops or resets is reported as a network failure too, instead of an unexplained error code.
+- A reply that isn't valid JSON is reported as "Invalid response from Mu-so." with its own exit code, rather than failing with a raw `jq` parse error.
 - Running the script with no arguments, or with `-h` / `--help`, prints the usage screen instead of failing.
 - The usage screen documents commands that already worked but were hidden: `info`, and the direct inputs `qobuz`, `spotify` and `tidal`. It also explains relative values (`volume +5`) and single-key lookups (`levels volume`).
 - Numbers with a leading zero (`volume 08`) are accepted — previously they were misread as octal and rejected.
