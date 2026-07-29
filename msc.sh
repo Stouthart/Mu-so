@@ -4,7 +4,6 @@ IFS=$'\n\t'
 
 [[ ${1-} == --xdbg ]] && { # Bash >= v5.0
   shift
-  declare +x LC_CTYPE=C
   PS4='+\e[5G\e[36m$(((${EPOCHREALTIME/./}-_ERT)/1000))\e[9G\e[33m$LINENO\e[13G\e[90m>\e[15G\e[m'
   declare -ir _ERT=${EPOCHREALTIME/./}
   set -x
@@ -12,36 +11,35 @@ IFS=$'\n\t'
 
 BASE="http://${MUSO_IP:-mu-so}:15081"
 
-# HTTP request — <uri> [method]
+# HTTP request - <uri> [method]
 call() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
-  wget --no-config --no-proxy -4 -q -t1 -T2 -O "$out" -U '' --method="${2:-GET}" "$BASE/$1" || error $?
+  wget --no-config --no-netrc --no-hsts --no-cookies --no-iri --no-proxy -4qt1 -T2 -U '' \
+    --method="${2:-GET}" -O "$out" "$BASE/$1" || error $?
 }
 
-# Print error and return
+# Print error and exit - <code>
 error() {
-  local msg
-
   case $1 in
-  4) msg='Network failure.' ;;
-  8) msg='Error, Mu-so in standby?' ;;
-  200) msg='Missing or invalid argument.' ;;
-  201) msg='Missing or invalid option.' ;;
-  *) msg="(wget) error $1." ;;
-  esac
+  4) echo 'Network failure, Mu-so offline?' ;;
+  8) echo 'Server error, Mu-so in standby?' ;;
+  200) echo 'Missing or invalid argument.' ;;
+  201) echo 'Missing or invalid option.' ;;
+  *) echo "Unexpected wget error $1." ;;
+  esac >&2
 
-  printf '%s\n' "$msg" >&2
-  return "$1"
+  exit "$1"
 }
 
 # Show now playing info
 info() {
-  local arr sec i
+  local arr sec tsv i
 
-  read -ra arr < <(query nowplaying '[.artistName//"?",.title//"?",.albumName//"?",.transportPosition//0,.duration//0,
-    .codec//"?",(.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
-    .sourceDetail//(.source//"?"|sub("^inputs/";""))]|@tsv')
+  tsv=$(query nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,
+    .codec,(.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
+    .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(if.==null or.==""then"?"else. end)|@tsv')
+  read -ra arr <<<"$tsv"
 
   for i in 3 4; do
     printf -v sec '%02d' $(((arr[i] / 1000) % 60))
@@ -51,31 +49,26 @@ info() {
   printf '%s / %s [%s]\n%s / %s - %s %skHz %dbit %dkb/s [%s]\n' "${arr[@]}"
 }
 
-# List or play items — <ussi> <filter> <arg>
+# List or play items - <ussi> <filter> [index]
 list() {
-  local id=1 nm names=() urls=() ussi
-
-  while read -r nm ussi; do
-    names+=("$nm")
-    urls+=("$ussi")
-  done < <(query "$1" ".children[]|select($2)|[.name,.ussi]|@tsv")
-
   if [[ -z $3 ]]; then
-    for nm in "${names[@]}"; do printf '%d) %s\n' $((id++)) "$nm"; done
-  elif [[ $3 =~ ^[0-9]{1,2}$ ]] && (($3 > 0 && $3 <= ${#urls[@]})); then
-    call "${urls[$3 - 1]}?cmd=play"
+    query "$1" "[.children[]|select($2)]|to_entries[]|\"\\(.key+1)) \\(.value.name)\"" || true
+  elif [[ $3 =~ ^[0-9]{1,2}$ ]] && ((10#$3 > 0)); then
+    local ussi
+    ussi=$(query "$1" "[.children[]|select($2)][$((10#$3))-1].ussi//empty") || error 200
+    play "$ussi"
   else
     error 200
   fi
 }
 
-# Get or set numeric value - <ussi> <key> <arg> <max>
+# Get, set or adjust (±) value - <ussi> <key> <arg> <max>
 number() {
   if [[ -z $3 ]]; then
     value "$1" "$2"
   elif signed "$3" "$4"; then
-    local val
-    [[ -z ${BASH_REMATCH[1]} ]] && val=$3 || val=$(query "$1" "[.$2|tonumber${BASH_REMATCH[0]},0,$4]|sort|.[1]")
+    local val=$((10#${BASH_REMATCH[2]}))
+    [[ -z ${BASH_REMATCH[1]} ]] || val=$(query "$1" "[.\"$2\"|tonumber${BASH_REMATCH[1]}$val,0,$4]|sort|.[1]")
     call "$1?$2=$val" PUT
   else
     error 200
@@ -85,20 +78,24 @@ number() {
 # Play item - <ussi>
 play() { call "$1?cmd=play"; }
 
-# JSON request — <ussi> <filter>
+# JSON request, exits on wget error - <ussi> <filter>
 query() {
-  local json
-  json=$(call "$1")
-  jq -cre "$2" <<<"$json"
+  call "$1" | jq -cre "$2" || {
+    set -- "${PIPESTATUS[@]}"
+    (($1 == 0)) || exit "$1"
+    return "$2"
+  }
 }
 
-# Seek to position - <arg>
+# Seek to position (±relative) - <sec>
 seek() {
   if signed "$1" 3600; then
-    local -i dur pos val=$((BASH_REMATCH[2] * 1000))
+    local tsv
+    local -i dur pos val=$((10#${BASH_REMATCH[2]} * 1000))
 
-    read -r pos dur < <(query nowplaying '[.transportPosition//0,.duration//0]|@tsv')
-    ((dur == 0)) && return
+    tsv=$(query nowplaying '[.transportPosition//0,.duration//0]|@tsv')
+    read -r pos dur <<<"$tsv"
+    ((dur)) || return 0
 
     case ${BASH_REMATCH[1]} in
     +) ((val += pos)) ;;
@@ -112,13 +109,13 @@ seek() {
   fi
 }
 
-# Numeric, optionally signed? — <arg> <max>
+# Numeric, optionally signed? Sets BASH_REMATCH - <arg> <max>
 signed() {
   [[ $1 =~ ^([+-]?)([0-9]{1,4})$ ]] || return 1
-  ((BASH_REMATCH[2] <= $2))
+  ((10#${BASH_REMATCH[2]} <= $2))
 }
 
-# Get single JSON value — <ussi> <key>
+# Get single JSON value - <ussi> <key>
 value() { query "$1" ".\"$2\"//empty"; }
 
 # Usage instructions
@@ -126,7 +123,7 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v7.4 - Control Naim Mu-so 2 over HTTP
+$nm v8.0 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -136,9 +133,10 @@ Power:
 
 Inputs:
   inputs | stations
+  qobuz | spotify | tidal
 
 Playback:
-  next | pause | play | prev | stop
+  info | next | pause | play | prev | stop
   seek <sec> | shuffle | repeat
 
 Playqueue:
@@ -153,11 +151,15 @@ Other:
 Information:
   capabilities | levels | network | nowplaying
   outputs | power | poweramp | system | update
+
+Numeric arguments accept a relative value (e.g. volume +5, seek -30).
+Information options accept a key (e.g. levels volume).
 EOF
 }
 
 opt=${1-}
 arg=${2-}
+(($# < 3)) || error 200
 
 # Option aliases
 case $opt in
@@ -178,7 +180,7 @@ inputs)
   list inputs '.disabled=="0"' "$arg"
   ;;
 radio | stations)
-  list favourites?sort=D:presetID .stationKey!=null "$arg"
+  list favourites?sort=D:presetID '.stationKey!=null' "$arg"
   ;;
 qobuz | spotify | tidal)
   play "inputs/$opt"
@@ -234,7 +236,7 @@ system/capabilities | levels | network | nowplaying | outputs | power | outputs/
     error 200
   fi
   ;;
-help)
+'' | -h | --help | help)
   usage
   ;;
 *)
