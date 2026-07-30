@@ -53,10 +53,10 @@ info() {
 # List or play items - <ussi> <filter> [index]
 list() {
   if [[ -z $3 ]]; then
-    query "$1" "[.children[]|select($2)]|to_entries[]|\"\\(.key+1)) \\(.value.name)\"" || true
-  elif [[ $3 =~ ^[0-9]{1,2}$ ]] && ((10#$3 > 0)); then
+    query "$1" "[.children[]|select($2)]|to_entries[]|\"\\(.key+1)) \\(.value.name)\"" || :
+  elif [[ $3 =~ ^[1-9][0-9]?$ ]]; then
     local ussi
-    ussi=$(query "$1" "[.children[]|select($2)][$((10#$3))-1].ussi//empty") || error 200
+    ussi=$(query "$1" "[.children[]|select($2)][$3-1].ussi//empty") || error 200
     play "$ussi"
   else
     error 200
@@ -68,7 +68,7 @@ number() {
   if [[ -z $3 ]]; then
     value "$1" "$2"
   elif signed "$3" "$4"; then
-    local val=$((10#${BASH_REMATCH[2]}))
+    local val=${BASH_REMATCH[2]}
     [[ -z ${BASH_REMATCH[1]} ]] || val=$(query "$1" "[.\"$2\"|tonumber${BASH_REMATCH[1]}$val,0,$4]|sort|.[1]")
     call "$1?$2=$val" PUT
   else
@@ -85,9 +85,8 @@ query() {
     set -- "${PIPESTATUS[@]}"
     (($1 == 0)) || exit "$1"
 
-    case $2 in 2 | 3 | 5) error 202 ;;
-    *) return "$2" ;;
-    esac
+    case $2 in 2 | 3 | 5) error 202 ;; esac
+    return "$2"
   }
 }
 
@@ -95,18 +94,18 @@ query() {
 seek() {
   if signed "$1" 3600; then
     local tsv
-    local -i dur pos val=$((10#${BASH_REMATCH[2]} * 1000))
+    local -i dur pos val=$((BASH_REMATCH[2] * 1000))
 
     tsv=$(query nowplaying '[.transportPosition//0,.duration//0]|@tsv')
     read -r pos dur <<<"$tsv"
     ((dur)) || return 0
 
     case ${BASH_REMATCH[1]} in
-    +) ((val += pos)) ;;
-    -) ((val = pos - val)) ;;
+    +) ((val += pos)) || : ;;
+    -) ((val = pos - val)) || : ;;
     esac
 
-    ((val = val < 0 ? 0 : val >= dur ? dur - 1 : val))
+    ((val = val < 0 ? 0 : val >= dur ? dur - 1 : val)) || :
     call "nowplaying?cmd=seek&position=$val"
   else
     error 200
@@ -115,8 +114,7 @@ seek() {
 
 # Numeric, optionally signed? Sets BASH_REMATCH - <arg> <max>
 signed() {
-  [[ $1 =~ ^([+-]?)([0-9]{1,4})$ ]] || return 1
-  ((10#${BASH_REMATCH[2]} <= $2))
+  [[ $1 =~ ^([+-]?)(0|[1-9][0-9]{0,3})$ && ${BASH_REMATCH[2]} -le $2 ]]
 }
 
 # Get single JSON value - <ussi> <key>
@@ -127,7 +125,7 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v8.0 - Control Naim Mu-so 2 over HTTP
+$nm v8.1 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -205,7 +203,7 @@ clear)
   call inputs/playqueue?clear=true POST
   ;;
 queue | playqueue)
-  query inputs/playqueue '.children[]?|"\(.artistName//"?") / \(.name) [\(.albumName//"?")]"' || true
+  query inputs/playqueue '.children[]?|"\(.artistName//"?") / \(.name) [\(.albumName//"?")]"' || :
   ;;
 loudness | mono)
   number outputs "$opt" "$arg" 1
@@ -235,7 +233,7 @@ system/capabilities | levels | network | nowplaying | outputs | power | outputs/
   if [[ -z $arg ]]; then
     query "$opt" 'to_entries[5:][]|select(.key!="cpu"and.key!="children")|"\(.key)=\(.value)"'
   elif [[ $arg =~ ^[[:alnum:]]{3,24}$ ]]; then
-    value "$opt" "$arg" || true
+    value "$opt" "$arg" || :
   else
     error 200
   fi

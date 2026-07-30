@@ -1,8 +1,16 @@
-<!-- v8.0 - Copyright © 2026 Stouthart. All rights reserved. -->
+<!-- v8.1 - Copyright © 2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
+
+## 8.1 — July 2026
+
+Argument handling tightened up.
+
+- `seek` no longer bails out when the target position works out to zero. `seek 0`, and a relative jump that lands exactly at the start of the track, now seek as asked instead of exiting with an unexplained error code.
+- Numbers with a leading zero (`volume 08`, `stations 02`) are rejected again, with the usual "Missing or invalid argument." message. Accepting them in 8.0 made `08` and `8` two spellings of one value; a numeric argument now has a single valid form.
+- Leaner argument validation and a simplified error path in the JSON helper — _code improvements_.
 
 ## 8.0 — July 2026
 
@@ -13,7 +21,7 @@ Error handling done right, plus a friendlier first run.
 - A reply that isn't valid JSON is reported as "Invalid response from Mu-so." with its own exit code, rather than failing with a raw `jq` parse error.
 - Running the script with no arguments, or with `-h` / `--help`, prints the usage screen instead of failing.
 - The usage screen documents commands that already worked but were hidden: `info`, and the direct inputs `qobuz`, `spotify` and `tidal`. It also explains relative values (`volume +5`) and single-key lookups (`levels volume`).
-- Numbers with a leading zero (`volume 08`) are accepted — previously they were misread as octal and rejected.
+- Numbers with a leading zero (`volume 08`) are accepted — previously they were misread as octal and rejected. (Reverted in 8.1.)
 - Now playing shows `?` for fields the speaker reports as empty, instead of leaving gaps.
 - Passing more than one argument is rejected up front rather than silently ignored.
 - Faster station and input selection: the item is resolved in a single filtered request instead of fetching the whole list first.

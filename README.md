@@ -1,4 +1,4 @@
-<!-- v8.0 - Copyright © 2026 Stouthart. All rights reserved. -->
+<!-- v8.1 - Copyright © 2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -50,7 +50,7 @@ Add that line to your `~/.zshrc` or `~/.bashrc` to make it permanent. To find th
 msc.sh <option> [argument]
 ```
 
-Numeric options print the current value when called without an argument, and accept a **relative** value prefixed with `+` or `-`. Information options accept a key to print a single field.
+Numeric options print the current value when called without an argument, and accept a **relative** value prefixed with `+` or `-`. Write numbers without leading zeros — `volume 8`, not `volume 08`. Information options accept a key to print a single field.
 
 ### Power
 
