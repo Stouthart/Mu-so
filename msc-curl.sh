@@ -9,14 +9,13 @@ IFS=$'\n\t'
   set -x
 }
 
-BASE="http://${MUSO_IP:-mu-so}:15081"
+BASE=http://${MUSO_IP:-mu-so}:15081
 
 # HTTP request - <uri> [method]
 call() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
-  curl -q4fsm2 --noproxy '*' --http1.1 --tcp-fastopen \
-    -HUser-Agent: -X"${2:-GET}" -o "$out" "$BASE/$1" || error $?
+  curl -q4fsm2 --noproxy '*' --http1.1 --tcp-fastopen -HUser-Agent: -X"${2:-GET}" -o $out "$BASE/$1" || error $?
 }
 
 # Print error and exit - <code>

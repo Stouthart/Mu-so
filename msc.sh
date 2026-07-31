@@ -9,14 +9,14 @@ IFS=$'\n\t'
   set -x
 }
 
-BASE="http://${MUSO_IP:-mu-so}:15081"
+BASE=http://${MUSO_IP:-mu-so}:15081
 
 # HTTP request - <uri> [method]
 call() {
   local out=-
   [[ -t 1 ]] && out=/dev/null
   wget --no-config --no-netrc --no-hsts --no-cookies --no-iri --no-proxy -4qt1 -T2 -U '' \
-    --method="${2:-GET}" -O "$out" "$BASE/$1" || error $?
+    --method="${2:-GET}" -O $out "$BASE/$1" || error $?
 }
 
 # Print error and exit - <code>
