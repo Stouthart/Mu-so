@@ -1,4 +1,4 @@
-<!-- v8.1 - Copyright © 2026 Stouthart. All rights reserved. -->
+<!-- v8.2 - Copyright © 2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 

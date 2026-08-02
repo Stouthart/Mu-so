@@ -35,19 +35,19 @@ error() {
 
 # Show now playing info
 info() {
-  local arr sec tsv i
+  local aFields sec tsv i
 
   tsv=$(query nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,
     .codec,(.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
     .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(if.==null or.==""then"?"else. end)|@tsv')
-  read -ra arr <<<"$tsv"
+  read -ra aFields <<<"$tsv"
 
   for i in 3 4; do
-    printf -v sec '%02d' $(((arr[i] / 1000) % 60))
-    arr[i]=$((arr[i] / 60000)):$sec
+    printf -v sec '%02d' $(((aFields[i] / 1000) % 60))
+    aFields[i]=$((aFields[i] / 60000)):$sec
   done
 
-  printf '%s / %s [%s]\n%s / %s - %s %skHz %dbit %dkb/s [%s]\n' "${arr[@]}"
+  printf '%s / %s [%s]\n%s / %s - %s %skHz %dbit %dkb/s [%s]\n' "${aFields[@]}"
 }
 
 # List or play items - <ussi> <filter> [index]
@@ -117,15 +117,12 @@ signed() {
   [[ $1 =~ ^([+-]?)(0|[1-9][0-9]{0,3})$ && ${BASH_REMATCH[2]} -le $2 ]]
 }
 
-# Get single JSON value - <ussi> <key>
-value() { query "$1" ".\"$2\"//empty"; }
-
 # Usage instructions
 usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v8.1 - Control Naim Mu-so 2 over HTTP
+$nm v8.2 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -159,6 +156,9 @@ Information options accept a key (e.g. levels volume).
 EOF
 }
 
+# Get single JSON value - <ussi> <key>
+value() { query "$1" ".\"$2\"//empty"; }
+
 opt=${1-}
 arg=${2-}
 (($# < 3)) || error 200
@@ -186,6 +186,9 @@ radio | stations)
   ;;
 qobuz | spotify | tidal)
   play "inputs/$opt"
+  ;;
+info)
+  info
   ;;
 next | play | playpause | prev | stop)
   call "nowplaying?cmd=$opt"
@@ -225,9 +228,6 @@ position)
   ;;
 timeout | standbyTimeout)
   number power standbyTimeout "$arg" 120
-  ;;
-info)
-  info
   ;;
 system/capabilities | levels | network | nowplaying | outputs | power | outputs/poweramp | system | update)
   if [[ -z $arg ]]; then

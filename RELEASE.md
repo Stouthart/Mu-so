@@ -1,8 +1,14 @@
-<!-- v8.1 - Copyright © 2026 Stouthart. All rights reserved. -->
+<!-- v8.2 - Copyright © 2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
+
+## 8.2 — August 2026
+
+Tidying only — _code improvements_.
+
+- Helper functions and the option dispatcher put back in alphabetical order, and a clearer name for the field array behind `info`. Behaviour is unchanged in both versions.
 
 ## 8.1 — July 2026
 
