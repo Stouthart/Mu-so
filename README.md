@@ -1,8 +1,8 @@
-<!-- v8.3 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v8.5 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
-A small Bash script that controls a **Naim Mu-so 2** from the command line, over your local network. It talks to the speaker's built-in HTTP API on port `15081` — no app, no cloud, no account. Handy for shell aliases, Apple Shortcuts, Stream Deck buttons, Home Assistant `shell_command`, or a cron job that puts the speaker to sleep at midnight.
+A small Bash script that controls a **Naim Mu-so 2** from the command line, over your local network. It talks to the speaker's built-in HTTP API on port `15081` — no app, no cloud, no account. Handy for shell aliases, Apple Shortcuts, Stream Deck buttons, Home Assistant `shell_command`, or a cron job that puts the speaker in standby at midnight.
 
 Two interchangeable versions are included:
 
@@ -56,10 +56,13 @@ Options that only act — `wake`, `play`, `volume 40` — print nothing at all, 
 
 ### Power
 
-| Option  | Description                                   |
-| ------- | --------------------------------------------- |
-| `sleep` | Put the speaker in standby (alias: `standby`) |
-| `wake`  | Turn the speaker on                           |
+| Option           | Description                                              |
+| ---------------- | -------------------------------------------------------- |
+| `sleep [0..120]` | Show the sleep timer, set it in minutes, or cancel it (0) |
+| `standby`        | Put the speaker in standby                               |
+| `wake`           | Turn the speaker on                                      |
+
+A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). The timer takes whole minutes only — unlike the other numeric options it does not accept a relative `+` or `-` value. It is a one-off countdown, unrelated to the idle standby timeout set with `timeout`.
 
 ### Inputs
 
@@ -155,7 +158,12 @@ msc.sh info
 msc.sh levels volume         # single field -> 40
 msc.sh system                # every field as key=value
 msc.sh timeout 30            # standby after 30 minutes idle
-msc.sh sleep                 # goodnight
+
+msc.sh sleep 45              # standby in 45 minutes
+msc.sh sleep                 # -> sleepActive=1
+                             #    sleepPeriod=2700
+msc.sh sleep 0               # cancel the sleep timer
+msc.sh standby               # goodnight
 ```
 
 Useful shell aliases:
@@ -242,7 +250,7 @@ Pass `--xdbg` as the very first argument to trace execution with per-line timing
 
 ## License
 
-Copyright © 2026 Stouthart. All rights reserved.
+Copyright © 2025-2026 Stouthart. All rights reserved.
 
 _The scripts in this repository are free for personal use. However, they are NOT published under a software license. This implies - as stated in the [GitHub Docs] - that standard copyright law applies, meaning the owner retains all rights to the source code and no one may reproduce, distribute, or create derivative works from this work._
 

@@ -116,18 +116,34 @@ signed() {
   [[ $1 =~ ^([+-]?)(0|[1-9][0-9]{0,3})$ && ${BASH_REMATCH[2]} -le $2 ]]
 }
 
+# Get, set (min) or cancel (0) sleep timer - <arg>
+sleep() {
+  if [[ -z $1 ]]; then
+    query alarms 'to_entries[]|select(.key|startswith("sleep"))|"\(.key)=\(.value)"'
+  elif signed "$1" 120 && [[ -z ${BASH_REMATCH[1]} ]]; then
+    local min=${BASH_REMATCH[2]}
+    if ((min)); then
+      call "alarms?sleepPeriod=$((min * 60))&cmd=sleep"
+    else
+      call alarms?cmd=cancelSleep
+    fi
+  else
+    error 200
+  fi
+}
+
 # Usage instructions
 usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v8.3 - Control Naim Mu-so 2 over HTTP
+$nm v8.5 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
 
 Power:
-  sleep | wake
+  sleep <0..120> | standby | wake
 
 Inputs:
   inputs | stations
@@ -171,7 +187,10 @@ esac
 
 # Main dispatcher
 case $opt in
-sleep | standby)
+sleep)
+  sleep "$arg"
+  ;;
+standby)
   call power?system=lona PUT
   ;;
 wake)

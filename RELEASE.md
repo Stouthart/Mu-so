@@ -1,8 +1,16 @@
-<!-- v8.3 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v8.5 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
+
+## 8.5 — August 2026
+
+`sleep` became a real sleep timer.
+
+- `sleep` no longer puts the speaker in standby straight away. It now drives the speaker's built-in sleep timer: `sleep 45` sends it to standby in 45 minutes, `sleep 0` cancels a running timer, and a bare `sleep` reports whether one is set and for how long (`sleepActive`, `sleepPeriod` in seconds).
+- `standby` — until now an alias for `sleep` — is the way to put the speaker in standby immediately. **Aliases, cron jobs and Shortcuts that call `sleep` for that must switch to `standby`**, or they will merely arm a timer.
+- The timer accepts whole minutes from 0 to 120. Relative values (`sleep +10`) are rejected with "Missing or invalid argument."
 
 ## 8.3 — August 2026
 
