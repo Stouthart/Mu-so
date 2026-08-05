@@ -1,8 +1,18 @@
-<!-- v8.2 - Copyright © 2026 Stouthart. All rights reserved. -->
+<!-- v8.3 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
+
+## 8.3 — August 2026
+
+A sturdier `info`, and commands that keep quiet.
+
+- `info` no longer gives up when the speaker reports a field it can't make a number of. Position, duration, sample rate, bit depth and bit rate now fall back to zero instead of aborting the whole line with "Invalid response from Mu-so."
+- Commands that only act — `wake`, `play`, `volume 40` — no longer dump the raw JSON reply when their output is redirected or piped. The response body was previously discarded only when writing to a terminal, so the same command behaved differently inside a pipeline.
+- Reading a value the speaker doesn't return (`volume`, `mute`, `timeout` and the rest) now says "Invalid response from Mu-so." and exits with 202, instead of exiting silently with an unexplained code.
+- In the `curl` version, a request that times out is reported as a network failure ("Mu-so offline?") like any other unreachable speaker, rather than a bare "Operation timeout." The exit code, 28, is unchanged.
+- Argument validation moved ahead of everything else, an unused error mapping dropped, and a simpler timer behind the debug trace — _code improvements_.
 
 ## 8.2 — August 2026
 

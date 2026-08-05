@@ -1,4 +1,4 @@
-<!-- v8.2 - Copyright © 2026 Stouthart. All rights reserved. -->
+<!-- v8.3 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -51,6 +51,8 @@ msc.sh <option> [argument]
 ```
 
 Numeric options print the current value when called without an argument, and accept a **relative** value prefixed with `+` or `-`. Write numbers without leading zeros — `volume 8`, not `volume 08`. Information options accept a key to print a single field.
+
+Options that only act — `wake`, `play`, `volume 40` — print nothing at all, whether to a terminal or into a pipe; the exit code tells you whether they worked.
 
 ### Power
 
@@ -215,15 +217,14 @@ sudo apt install jq
 
 ## Exit codes
 
-| Code                                     | Meaning                                              |
-| ---------------------------------------- | ---------------------------------------------------- |
-| `0`                                      | Success                                              |
-| `4` (wget) / `6`, `7`, `52`, `56` (curl) | Network failure — speaker offline or wrong address   |
-| `8` (wget) / `22` (curl)                 | Server error — the speaker is probably in standby    |
-| `28`                                     | Operation timed out (curl only)                      |
-| `200`                                    | Missing or invalid argument                          |
-| `201`                                    | Missing or invalid option                            |
-| `202` / `1` (curl)                       | The speaker returned something that isn't valid JSON |
+| Code                                           | Meaning                                                       |
+| ---------------------------------------------- | ------------------------------------------------------------- |
+| `0`                                            | Success                                                       |
+| `4` (wget) / `6`, `7`, `28`, `52`, `56` (curl) | Network failure — speaker offline, timed out or wrong address |
+| `8` (wget) / `22` (curl)                       | Server error — the speaker is probably in standby             |
+| `200`                                          | Missing or invalid argument                                   |
+| `201`                                          | Missing or invalid option                                     |
+| `202`                                          | The speaker returned something that isn't valid JSON          |
 
 ## Debugging
 

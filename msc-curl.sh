@@ -5,26 +5,23 @@ IFS=$'\n\t'
 [[ ${1-} == --xdbg ]] && { # Bash >= v5.0
   shift
   PS4='+\e[5G\e[36m$(((${EPOCHREALTIME/./}-_ERT)/1000))\e[9G\e[33m$LINENO\e[13G\e[90m>\e[15G\e[m'
-  declare -ir _ERT=${EPOCHREALTIME/./}
+  readonly _ERT=${EPOCHREALTIME/./}
   set -x
 }
 
 BASE=http://${MUSO_IP:-mu-so}:15081
 
-# HTTP request - <uri> [method]
+# HTTP request - <uri> [method] [output]
 call() {
-  local out=-
-  [[ -t 1 ]] && out=/dev/null
-  curl -q4fsm2 --noproxy '*' --http1.1 --tcp-fastopen -HUser-Agent: -X"${2:-GET}" -o $out "$BASE/$1" || error $?
+  curl -q4fsm2 --noproxy '*' --http1.1 --tcp-fastopen -HUser-Agent: -X"${2:-GET}" \
+    -o "${3:-/dev/null}" "$BASE/$1" || error $?
 }
 
 # Print error and exit - <code>
 error() {
   case $1 in
-  1) echo 'Invalid response from Mu-so.' ;;
-  6 | 7 | 52 | 56) echo 'Network failure, Mu-so offline?' ;;
+  6 | 7 | 28 | 52 | 56) echo 'Network failure, Mu-so offline?' ;;
   22) echo 'Server error, Mu-so in standby?' ;;
-  28) echo 'Operation timeout.' ;;
   200) echo 'Missing or invalid argument.' ;;
   201) echo 'Missing or invalid option.' ;;
   202) echo 'Invalid response from Mu-so.' ;;
@@ -38,8 +35,9 @@ error() {
 info() {
   local aFields sec tsv i
 
-  tsv=$(query nowplaying '[.artistName,.title,.albumName,.transportPosition//0,.duration//0,
-    .codec,(.sampleRate//0|tonumber/1000),.bitDepth//0,(.bitRate//0|tonumber|if.<16000then. else./1000|round end),
+  tsv=$(query nowplaying '[.artistName,.title,.albumName,(.transportPosition|tonumber?)//0,(.duration|tonumber?)//0,
+    .codec,((.sampleRate|tonumber?)//0)/1000,(.bitDepth|tonumber?)//0,
+    ((.bitRate|tonumber?)//0|if.<16000then. else./1000|round end),
     .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(if.==null or.==""then"?"else. end)|@tsv')
   read -ra aFields <<<"$tsv"
 
@@ -67,7 +65,7 @@ list() {
 # Get, set or adjust (±) value - <ussi> <key> <arg> <max>
 number() {
   if [[ -z $3 ]]; then
-    value "$1" "$2"
+    value "$1" "$2" || error 202
   elif signed "$3" "$4"; then
     local val=${BASH_REMATCH[2]}
     [[ -z ${BASH_REMATCH[1]} ]] || val=$(query "$1" "[.\"$2\"|tonumber${BASH_REMATCH[1]}$val,0,$4]|sort|.[1]")
@@ -80,9 +78,9 @@ number() {
 # Play item - <ussi>
 play() { call "$1?cmd=play"; }
 
-# JSON request, exits on wget error - <ussi> <filter>
+# JSON request, exits on error - <ussi> <filter>
 query() {
-  call "$1" | jq -cre "$2" || {
+  call "$1" GET - | jq -cre "$2" || {
     set -- "${PIPESTATUS[@]}"
     (($1 == 0)) || exit "$1"
 
@@ -123,8 +121,8 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v8.2 - Control Naim Mu-so 2 over HTTP
-Copyright (C) 2026 Stouthart. All rights reserved.
+$nm v8.3 - Control Naim Mu-so 2 over HTTP
+Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
 
@@ -160,9 +158,9 @@ EOF
 # Get single JSON value - <ussi> <key>
 value() { query "$1" ".\"$2\"//empty"; }
 
+(($# < 3)) || error 200
 opt=${1-}
 arg=${2-}
-(($# < 3)) || error 200
 
 # Option aliases
 case $opt in
