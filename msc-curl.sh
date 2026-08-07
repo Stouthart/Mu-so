@@ -31,8 +31,21 @@ error() {
   exit "$1"
 }
 
+# List or play items - <ussi> <filter> [index]
+list() {
+  if [[ -z $3 ]]; then
+    query "$1" "[.children[]?|select($2)]|to_entries[]|\"\\(.key+1)) \\(.value.name)\"" || :
+  elif [[ $3 =~ ^[1-9][0-9]?$ ]]; then
+    local ussi
+    ussi=$(query "$1" "[.children[]?|select($2)][$3-1].ussi//empty") || error 200
+    start "$ussi"
+  else
+    error 200
+  fi
+}
+
 # Show now playing info
-info() {
+now() {
   local aFields sec tsv i
 
   tsv=$(query nowplaying '[.artistName,.title,.albumName,(.transportPosition|tonumber?)//0,(.duration|tonumber?)//0,
@@ -47,19 +60,6 @@ info() {
   done
 
   printf '%s / %s [%s]\n%s / %s - %s %skHz %dbit %dkb/s [%s]\n' "${aFields[@]}"
-}
-
-# List or play items - <ussi> <filter> [index]
-list() {
-  if [[ -z $3 ]]; then
-    query "$1" "[.children[]?|select($2)]|to_entries[]|\"\\(.key+1)) \\(.value.name)\"" || :
-  elif [[ $3 =~ ^[1-9][0-9]?$ ]]; then
-    local ussi
-    ussi=$(query "$1" "[.children[]?|select($2)][$3-1].ussi//empty") || error 200
-    start "$ussi"
-  else
-    error 200
-  fi
 }
 
 # Get, set or adjust (±) value - <ussi> <key> <arg> <max>
@@ -148,10 +148,10 @@ Power:
   sleep 0..120 | standby | wake
 
 Inputs:
-  inputs num | stations num
+  inputs 1..n | stations 1..n
 
 Playback:
-  info | next | pause | play | prev | stop
+  next | now | pause | play | prev | stop
   seek 0..3600 | shuffle 0..1 | repeat 0..2
 
 Playqueue:
@@ -210,11 +210,11 @@ inputs)
 radio | stations)
   list favourites?sort=D:presetID '.stationKey!=null' "$arg"
   ;;
-info)
-  info
-  ;;
 next | play | playpause | prev | stop)
   call "nowplaying?cmd=$opt"
+  ;;
+now | info)
+  now
   ;;
 seek)
   seek "$arg"

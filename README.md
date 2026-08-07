@@ -2,7 +2,7 @@
 
 # Control Naim Mu-so 2nd generation over HTTP
 
-A small Bash script that controls a **Naim Mu-so 2** from the command line, over your local network. It talks to the speaker's built-in HTTP API on port `15081` — no app, no cloud, no account. Handy for shell aliases, Apple Shortcuts, Stream Deck buttons, Home Assistant `shell_command`, or a cron job that puts the speaker in standby at midnight.
+A small Bash script that controls a **Naim Mu-so 2** from the command line, over your local network. It talks to the speaker's built-in HTTP API on port `15081` - no app, no cloud, no account. Handy for shell aliases, Apple Shortcuts, Stream Deck buttons, Home Assistant `shell_command`, or a cron job that puts the speaker in standby at midnight.
 
 Two interchangeable versions are included:
 
@@ -11,12 +11,12 @@ Two interchangeable versions are included:
 | `msc.sh`      | `wget` | Linux, and macOS with Homebrew `wget` (slightly faster) |
 | `msc-curl.sh` | `curl` | macOS and Git Bash on Windows (`curl` is preinstalled)  |
 
-Both take the same options and behave identically — pick whichever tool you already have.
+Both take the same options and behave identically - pick whichever tool you already have.
 
 ## Requirements
 
 - **Bash** 3.2 or newer (the version macOS ships is fine)
-- **jq** — see [Installing jq](#installing-jq)
+- **jq** - see [Installing jq](#installing-jq)
 - **wget** (for `msc.sh`) or **curl** (for `msc-curl.sh`)
 - A Naim Mu-so 2 reachable on your network
 
@@ -50,39 +50,39 @@ Add that line to your `~/.zshrc` or `~/.bashrc` to make it permanent. To find th
 msc.sh <option> [argument]
 ```
 
-Numeric options print the current value when called without an argument, and accept a **relative** value prefixed with `+` or `-`. Write numbers without leading zeros — `volume 8`, not `volume 08`. Information options accept a key to print a single field.
+Numeric options print the current value when called without an argument, and accept a **relative** value prefixed with `+` or `-`. Write numbers without leading zeros - `volume 8`, not `volume 08`. Information options accept a key to print a single field.
 
-Options that only act — `wake`, `play`, `volume 40` — print nothing at all, whether to a terminal or into a pipe; the exit code tells you whether they worked.
+Options that only act - `wake`, `play`, `volume 40` - print nothing at all, whether to a terminal or into a pipe; the exit code tells you whether they worked.
 
 ### Power
 
-| Option           | Description                                              |
-| ---------------- | -------------------------------------------------------- |
+| Option           | Description                                               |
+| ---------------- | --------------------------------------------------------- |
 | `sleep [0..120]` | Show the sleep timer, set it in minutes, or cancel it (0) |
-| `standby`        | Put the speaker in standby                               |
-| `wake`           | Turn the speaker on                                      |
+| `standby`        | Put the speaker in standby                                |
+| `wake`           | Turn the speaker on                                       |
 
-A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). The timer takes whole minutes only — unlike the other numeric options it does not accept a relative `+` or `-` value. It is a one-off countdown, unrelated to the idle standby timeout set with `timeout`.
+A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). The timer takes whole minutes only - unlike the other numeric options it does not accept a relative `+` or `-` value. It is a one-off countdown, unrelated to the idle standby timeout set with `timeout`.
 
 ### Inputs
 
-| Option         | Description                                                 |
-| -------------- | ----------------------------------------------------------- |
-| `inputs [n]`   | List selectable inputs, or select input _n_                 |
-| `stations [n]` | List radio favourites, or play station _n_ (alias: `radio`) |
+| Option            | Description                                                 |
+| ----------------- | ----------------------------------------------------------- |
+| `inputs [1..n]`   | List selectable inputs, or select input _n_                 |
+| `stations [1..n]` | List radio favourites, or play station _n_ (alias: `radio`) |
 
-`inputs` lists the inputs the speaker reports as selectable and not disabled, numbered from 1. The numbering follows that list, so it shifts if you enable or disable an input in the Naim app. Services the speaker doesn't mark selectable — Qobuz and Tidal, typically — are not listed and cannot be selected this way; use `qobuz` or `tidal` to inspect their state.
+`inputs` lists the inputs the speaker reports as selectable and not disabled, numbered from 1. The numbering follows that list, so it shifts if you enable or disable an input in the Naim app. Services the speaker doesn't mark selectable - Qobuz and Tidal, typically - are not listed and cannot be selected this way; use `qobuz` or `tidal` to inspect their state.
 
 ### Playback
 
-| Option                    | Description                                 |
-| ------------------------- | ------------------------------------------- |
-| `info`                    | Show formatted now playing information      |
-| `play` / `pause` / `stop` | Transport control                           |
-| `next` / `prev`           | Skip track                                  |
-| `seek [0..3600]`          | Get the position in seconds, or seek to it  |
-| `shuffle [0\|1]`          | Get or set shuffle                          |
-| `repeat [0..2]`           | Get or set repeat                           |
+| Option                    | Description                                     |
+| ------------------------- | ----------------------------------------------- |
+| `now`                     | Show formatted now playing info (alias: `info`) |
+| `play` / `pause` / `stop` | Transport control                               |
+| `next` / `prev`           | Skip track                                      |
+| `seek [0..3600]`          | Get the position in seconds, or seek to it      |
+| `shuffle [0..1]`          | Get or set shuffle                              |
+| `repeat [0..2]`           | Get or set repeat                               |
 
 ### Playqueue
 
@@ -98,9 +98,9 @@ The queue is numbered from 1, and the track that is playing is marked with a tra
 | Option            | Description                      |
 | ----------------- | -------------------------------- |
 | `volume [0..100]` | Get or set volume (alias: `vol`) |
-| `mute [0\|1]`     | Get or set mute                  |
-| `loudness [0\|1]` | Get or set loudness              |
-| `mono [0\|1]`     | Get or set mono                  |
+| `mute [0..1]`     | Get or set mute                  |
+| `loudness [0..1]` | Get or set loudness              |
+| `mono [0..1]`     | Get or set mono                  |
 
 ### Other
 
@@ -135,7 +135,7 @@ Print all fields, or a single field when given a key.
 
 Housekeeping keys the API repeats on every node (`version`, `changestamp`, `name`, `ussi`, `class`, `cpu`, `children`) are left out; everything else the node returns is printed as `key=value`.
 
-`help` — or no arguments at all — prints the built-in usage screen.
+`help` - or no arguments at all - prints the built-in usage screen.
 
 ## Examples
 
@@ -167,7 +167,7 @@ msc.sh next                  # next track
 msc.sh queue                 # 1) Nick Cave / Red Right Hand [Let Love In] *
                              # 2) Portishead / Roads [Dummy]
 
-msc.sh info
+msc.sh now
 # Nick Cave & The Bad Seeds / Red Right Hand [Let Love In]
 # 1:23 / 6:11 - FLAC 44.1kHz 16bit 1004kb/s [Qobuz]
 
@@ -188,7 +188,7 @@ Useful shell aliases:
 
 ```bash
 alias vol='msc-curl.sh volume'
-alias np='msc-curl.sh info'
+alias np='msc-curl.sh now'
 ```
 
 ## Installing jq
@@ -197,14 +197,14 @@ alias np='msc-curl.sh info'
 
 ### macOS
 
-With [Homebrew](https://brew.sh) — the easy route, and it gets you `wget` too:
+With [Homebrew](https://brew.sh) - the easy route, and it gets you `wget` too:
 
 ```bash
 brew install jq
 brew install wget          # only needed for msc.sh
 ```
 
-Without Homebrew, `jq` is a single self-contained binary you can drop into your `PATH`. Download the build for your Mac from the [jq releases page](https://github.com/jqlang/jq/releases) — `jq-macos-arm64` for Apple Silicon, `jq-macos-amd64` for Intel:
+Without Homebrew, `jq` is a single self-contained binary you can drop into your `PATH`. Download the build for your Mac from the [jq releases page](https://github.com/jqlang/jq/releases) - `jq-macos-arm64` for Apple Silicon, `jq-macos-amd64` for Intel:
 
 ```bash
 curl -Lo jq https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-macos-arm64
@@ -220,8 +220,8 @@ On very old macOS (10.6–10.11) use an older release such as jq 1.6, where the 
 
 Bash isn't native to Windows, so first install one of:
 
-- **[Git for Windows](https://git-scm.com/download/win)** — includes Git Bash and `curl`, so use `msc-curl.sh`
-- **WSL** (`wsl --install`) — a full Linux environment with both `wget` and `curl`
+- **[Git for Windows](https://git-scm.com/download/win)** - includes Git Bash and `curl`, so use `msc-curl.sh`
+- **WSL** (`wsl --install`) - a full Linux environment with both `wget` and `curl`
 
 Then install `jq` from PowerShell with a package manager:
 
@@ -246,8 +246,8 @@ sudo apt install jq
 | Code                                           | Meaning                                                       |
 | ---------------------------------------------- | ------------------------------------------------------------- |
 | `0`                                            | Success                                                       |
-| `4` (wget) / `6`, `7`, `28`, `52`, `56` (curl) | Network failure — speaker offline, timed out or wrong address |
-| `8` (wget) / `22` (curl)                       | Server error — the speaker is probably in standby             |
+| `4` (wget) / `6`, `7`, `28`, `52`, `56` (curl) | Network failure - speaker offline, timed out or wrong address |
+| `8` (wget) / `22` (curl)                       | Server error - the speaker is probably in standby             |
 | `200`                                          | Missing or invalid argument                                   |
 | `201`                                          | Missing or invalid option                                     |
 | `202`                                          | The speaker returned something that isn't valid JSON          |
@@ -264,7 +264,7 @@ Pass `--xdbg` as the very first argument to trace execution with per-line timing
 
 - The API is undocumented and unofficial. It may change with a firmware update.
 - Requests are plain HTTP on the local network; there is no authentication.
-- Waking from standby takes a few seconds — a command issued immediately after `wake` may still report a server error.
+- Waking from standby takes a few seconds - a command issued immediately after `wake` may still report a server error.
 
 ## License
 
