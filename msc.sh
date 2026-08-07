@@ -38,7 +38,7 @@ info() {
   tsv=$(query nowplaying '[.artistName,.title,.albumName,(.transportPosition|tonumber?)//0,(.duration|tonumber?)//0,
     .codec,((.sampleRate|tonumber?)//0)/1000,(.bitDepth|tonumber?)//0,
     ((.bitRate|tonumber?)//0|if.<16000then. else./1000|round end),
-    .sourceDetail//(.source//"?"|sub("^inputs/";""))]|map(if.==null or.==""then"?"else. end)|@tsv')
+    .sourceDetail//(.source//"?"|ltrimstr("inputs/"))]|map(if.==null or.==""then"?"else. end)|@tsv')
   read -ra aFields <<<"$tsv"
 
   for i in 3 4; do
@@ -52,11 +52,11 @@ info() {
 # List or play items - <ussi> <filter> [index]
 list() {
   if [[ -z $3 ]]; then
-    query "$1" "[.children[]|select($2)]|to_entries[]|\"\\(.key+1)) \\(.value.name)\"" || :
+    query "$1" "[.children[]?|select($2)]|to_entries[]|\"\\(.key+1)) \\(.value.name)\"" || :
   elif [[ $3 =~ ^[1-9][0-9]?$ ]]; then
     local ussi
-    ussi=$(query "$1" "[.children[]|select($2)][$3-1].ussi//empty") || error 200
-    play "$ussi"
+    ussi=$(query "$1" "[.children[]?|select($2)][$3-1].ussi//empty") || error 200
+    start "$ussi"
   else
     error 200
   fi
@@ -68,15 +68,12 @@ number() {
     value "$1" "$2" || error 202
   elif signed "$3" "$4"; then
     local val=${BASH_REMATCH[2]}
-    [[ -z ${BASH_REMATCH[1]} ]] || val=$(query "$1" "[.\"$2\"|tonumber${BASH_REMATCH[1]}$val,0,$4]|sort|.[1]")
+    [[ -z ${BASH_REMATCH[1]} ]] || val=$(query "$1" "[((.\"$2\"|tonumber?)//0)${BASH_REMATCH[1]}$val,0,$4]|sort|.[1]")
     call "$1?$2=$val" PUT
   else
     error 200
   fi
 }
-
-# Play item - <ussi>
-play() { call "$1?cmd=play"; }
 
 # JSON request, exits on error - <ussi> <filter>
 query() {
@@ -89,13 +86,15 @@ query() {
   }
 }
 
-# Seek to position (±relative) - <sec>
+# Get or seek to position (±relative) - [sec]
 seek() {
-  if signed "$1" 3600; then
+  if [[ -z $1 ]]; then
+    query nowplaying '((.transportPosition|tonumber?)//0)/1000|floor'
+  elif signed "$1" 3600; then
     local tsv
     local -i dur pos val=$((BASH_REMATCH[2] * 1000))
 
-    tsv=$(query nowplaying '[.transportPosition//0,.duration//0]|@tsv')
+    tsv=$(query nowplaying '[(.transportPosition|tonumber?)//0,(.duration|tonumber?)//0]|@tsv')
     read -r pos dur <<<"$tsv"
     ((dur)) || return 0
 
@@ -132,40 +131,43 @@ sleep() {
   fi
 }
 
+# Start item - <ussi>
+start() { call "$1?cmd=play"; }
+
 # Usage instructions
 usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v8.5 - Control Naim Mu-so 2 over HTTP
+$nm v9.0 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
 
 Power:
-  sleep <0..120> | standby | wake
+  sleep 0..120 | standby | wake
 
 Inputs:
-  inputs | stations
-  qobuz | spotify | tidal
+  inputs num | stations num
 
 Playback:
   info | next | pause | play | prev | stop
-  seek <sec> | shuffle | repeat
+  seek 0..3600 | shuffle 0..1 | repeat 0..2
 
 Playqueue:
   clear | queue
 
 Audio:
-  loudness | mono | mute | volume <0..100>
+  loudness 0..1 | mono 0..1 | mute 0..1 | volume 0..100
 
 Other:
-  lighting | max | position | timeout <0..120>
+  lighting 0..2 | maxvol 0..100 | roomcomp 0..2 | timeout 0..120
 
 Information:
-  capabilities | levels | network | nowplaying
-  outputs | power | poweramp | system | update
+  bluetooth | capabilities | levels | network | nowplaying | outputs | power
+  poweramp | qobuz | spotify | system | tidal | update | wired | wireless
 
+Omit the argument to read the current value.
 Numeric arguments accept a relative value (e.g. volume +5, seek -30).
 Information options accept a key (e.g. levels volume).
 EOF
@@ -180,9 +182,15 @@ arg=${2-}
 
 # Option aliases
 case $opt in
+bluetooth) opt=inputs/bluetooth ;;
 capabilities) opt=system/capabilities ;;
 pause) opt=playpause ;;
 poweramp) opt=outputs/poweramp ;;
+qobuz) opt=inputs/qobuz ;;
+spotify) opt=inputs/spotify ;;
+tidal) opt=inputs/tidal ;;
+wired) opt=network/wired ;;
+wireless) opt=network/wireless ;;
 esac
 
 # Main dispatcher
@@ -197,13 +205,10 @@ wake)
   call power?system=on PUT
   ;;
 inputs)
-  list inputs '.disabled=="0"' "$arg"
+  list inputs '.selectable=="1"and.disabled!="1"' "$arg"
   ;;
 radio | stations)
   list favourites?sort=D:presetID '.stationKey!=null' "$arg"
-  ;;
-qobuz | spotify | tidal)
-  play "inputs/$opt"
   ;;
 info)
   info
@@ -224,7 +229,9 @@ clear)
   call inputs/playqueue?clear=true POST
   ;;
 queue | playqueue)
-  query inputs/playqueue '.children[]?|"\(.artistName//"?") / \(.name) [\(.albumName//"?")]"' || :
+  query inputs/playqueue '[.children[]?+{c:.current}]|to_entries[]|
+    "\(.key+1)) \(.value.artistName//"?") / \(.value.name) [\(.value.albumName//"?")]\(if
+    .value.ussi==.value.c then" *"else""end)"' || :
   ;;
 loudness | mono)
   number outputs "$opt" "$arg" 1
@@ -238,18 +245,19 @@ vol | volume)
 lighting | lightTheme)
   number userinterface lightTheme "$arg" 2
   ;;
-max | maxVolume)
+maxvol | maxVolume)
   number outputs/poweramp maxVolume "$arg" 100
   ;;
-position)
+roomcomp | position)
   number outputs position "$arg" 2
   ;;
 timeout | standbyTimeout)
   number power standbyTimeout "$arg" 120
   ;;
-system/capabilities | levels | network | nowplaying | outputs | power | outputs/poweramp | system | update)
+inputs/bluetooth | system/capabilities | levels | network | nowplaying | outputs | power | outputs/poweramp | \
+  inputs/qobuz | inputs/spotify | system | inputs/tidal | update | network/wired | network/wireless)
   if [[ -z $arg ]]; then
-    query "$opt" 'to_entries[5:][]|select(.key!="cpu"and.key!="children")|"\(.key)=\(.value)"'
+    query "$opt" 'del(.version,.changestamp,.name,.ussi,.class,.cpu,.children)|to_entries[]|"\(.key)=\(.value)"'
   elif [[ $arg =~ ^[[:alnum:]]{3,24}$ ]]; then
     value "$opt" "$arg" || :
   else

@@ -1,4 +1,4 @@
-<!-- v8.5 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v9.0 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -68,11 +68,10 @@ A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). T
 
 | Option         | Description                                                 |
 | -------------- | ----------------------------------------------------------- |
-| `inputs [n]`   | List available inputs, or select input _n_                  |
+| `inputs [n]`   | List selectable inputs, or select input _n_                 |
 | `stations [n]` | List radio favourites, or play station _n_ (alias: `radio`) |
-| `qobuz`        | Switch to the Qobuz input                                   |
-| `spotify`      | Switch to the Spotify input                                 |
-| `tidal`        | Switch to the Tidal input                                   |
+
+`inputs` lists the inputs the speaker reports as selectable and not disabled, numbered from 1. The numbering follows that list, so it shifts if you enable or disable an input in the Naim app. Services the speaker doesn't mark selectable — Qobuz and Tidal, typically — are not listed and cannot be selected this way; use `qobuz` or `tidal` to inspect their state.
 
 ### Playback
 
@@ -81,7 +80,7 @@ A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). T
 | `info`                    | Show formatted now playing information      |
 | `play` / `pause` / `stop` | Transport control                           |
 | `next` / `prev`           | Skip track                                  |
-| `seek <sec>`              | Seek to a position in seconds, or ±relative |
+| `seek [0..3600]`          | Get the position in seconds, or seek to it  |
 | `shuffle [0\|1]`          | Get or set shuffle                          |
 | `repeat [0..2]`           | Get or set repeat                           |
 
@@ -91,6 +90,8 @@ A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). T
 | ------- | ----------------------------------------------- |
 | `queue` | List the current playqueue (alias: `playqueue`) |
 | `clear` | Empty the playqueue                             |
+
+The queue is numbered from 1, and the track that is playing is marked with a trailing `*`.
 
 ### Audio
 
@@ -103,28 +104,36 @@ A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). T
 
 ### Other
 
-| Option             | Description                               |
-| ------------------ | ----------------------------------------- |
-| `lighting [0..2]`  | Get or set the light theme                |
-| `max [0..100]`     | Get or set the power amp maximum volume   |
-| `position [0..2]`  | Get or set room compensation              |
-| `timeout [0..120]` | Get or set the standby timeout in minutes |
+| Option             | Description                                      |
+| ------------------ | ------------------------------------------------ |
+| `lighting [0..2]`  | Get or set the light theme                       |
+| `maxvol [0..100]`  | Get or set the power amp maximum volume          |
+| `roomcomp [0..2]`  | Get or set room compensation (alias: `position`) |
+| `timeout [0..120]` | Get or set the standby timeout in minutes        |
 
 ### Information
 
 Print all fields, or a single field when given a key.
 
-| Option         | Description                     |
-| -------------- | ------------------------------- |
-| `capabilities` | System capabilities             |
-| `levels`       | Volume, mute and related levels |
-| `network`      | Network status                  |
-| `nowplaying`   | Raw now playing data            |
-| `outputs`      | Output settings                 |
-| `power`        | Power state and standby timeout |
-| `poweramp`     | Power amp settings              |
-| `system`       | System and firmware details     |
-| `update`       | Firmware update status          |
+| Option         | Description                                      |
+| -------------- | ------------------------------------------------ |
+| `bluetooth`    | Bluetooth name, pairing and connection state     |
+| `capabilities` | System capabilities                              |
+| `levels`       | Volume, mute and related levels                  |
+| `network`      | Network status                                   |
+| `nowplaying`   | Raw now playing data                             |
+| `outputs`      | Output settings                                  |
+| `power`        | Power state and standby timeout                  |
+| `poweramp`     | Power amp settings                               |
+| `qobuz`        | Qobuz input state                                |
+| `spotify`      | Spotify input state                              |
+| `system`       | System and firmware details                      |
+| `tidal`        | Tidal input state                                |
+| `update`       | Firmware update status                           |
+| `wired`        | Ethernet interface details                       |
+| `wireless`     | Wi-Fi interface details, signal and link quality |
+
+Housekeeping keys the API repeats on every node (`version`, `changestamp`, `name`, `ussi`, `class`, `cpu`, `children`) are left out; everything else the node returns is printed as `key=value`.
 
 `help` — or no arguments at all — prints the built-in usage screen.
 
@@ -144,12 +153,19 @@ msc.sh stations              # 1) NPO Radio 2
                              # 3) FIP
 msc.sh stations 2            # play BBC Radio 6 Music
 
-msc.sh inputs                # list the enabled inputs
-msc.sh spotify               # switch straight to Spotify
+msc.sh inputs                # 1) HDMI
+                             # 2) Internet Radio
+                             # 3) Spotify
+                             # 4) Playqueue
+msc.sh inputs 3              # switch to Spotify
 
+msc.sh seek                  # -> 83
 msc.sh seek 90               # jump to 1:30
 msc.sh seek +30              # skip forward half a minute
 msc.sh next                  # next track
+
+msc.sh queue                 # 1) Nick Cave / Red Right Hand [Let Love In] *
+                             # 2) Portishead / Roads [Dummy]
 
 msc.sh info
 # Nick Cave & The Bad Seeds / Red Right Hand [Let Love In]
@@ -157,6 +173,8 @@ msc.sh info
 
 msc.sh levels volume         # single field -> 40
 msc.sh system                # every field as key=value
+msc.sh system hostCpuTemp    # -> 4319 (43.2 degrees)
+msc.sh wireless              # Wi-Fi signal, link quality, SSID
 msc.sh timeout 30            # standby after 30 minutes idle
 
 msc.sh sleep 45              # standby in 45 minutes

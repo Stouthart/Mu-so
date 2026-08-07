@@ -1,8 +1,23 @@
-<!-- v8.5 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v9.0 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
+
+## 9.0 — August 2026
+
+More of the speaker readable, and option names that say what they do.
+
+- **`qobuz`, `spotify` and `tidal` no longer switch the input.** They are now information options that report that input's state, in line with the other nodes. Input selection goes through the list instead — `inputs`, then `inputs <n>`. **Aliases, cron jobs and Shortcuts that call `qobuz`, `spotify` or `tidal` to start playing must be changed**, or they will merely print a block of `key=value` lines. Note that only inputs the speaker marks as selectable are listed: Spotify is, Qobuz and Tidal are not, so for those two there is no direct replacement for the old shortcut.
+- Six new information options: `bluetooth` (name, pairing and connection state), `qobuz`, `spotify`, `tidal`, and `wired` / `wireless` for the two network interfaces — signal level, link quality, SSID and the rest.
+- **`max` is now `maxvol`, and `position` is now `roomcomp`.** `maxVolume` and `position` still work as long-form aliases, but a bare `max` is rejected with "Missing or invalid option." The old names read as an adjective and a playback position; the new ones name the setting.
+- A bare `seek` prints the current playback position in seconds, instead of failing with "Missing or invalid argument." Every numeric option now reads as well as writes.
+- `queue` numbers its entries from 1 and marks the track that is playing with a trailing `*`, matching the numbered lists `inputs` and `stations` already print.
+- Information options print every field the node returns, minus the housekeeping keys the API repeats everywhere (`version`, `changestamp`, `name`, `ussi`, `class`, `cpu`, `children`). Previously the first five entries were dropped by position, which hid real fields on nodes that order their keys differently, and let housekeeping keys through on the others.
+- `inputs` lists what the speaker reports as selectable rather than merely not disabled, so the numbering no longer includes inputs that cannot be chosen.
+- A relative adjustment (`volume +5`, `timeout -10`) no longer aborts when the speaker leaves the current value out of its reply or returns it as something that isn't a number; it counts as zero and the new value is set from there.
+- `inputs` and `stations` no longer fail with "Invalid response from Mu-so." when the speaker leaves the list out of its reply altogether; they print nothing and succeed, as `queue` already did.
+- Usage screen rewritten to show each option's accepted range, and the internal `play` helper renamed to `start` — _code improvements_.
 
 ## 8.5 — August 2026
 
