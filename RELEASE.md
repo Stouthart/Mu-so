@@ -1,8 +1,17 @@
-<!-- v9.0 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v9.1 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
+
+## 9.1 - August 2026
+
+The HDMI input, and a now playing line that copes without a codec.
+
+- New information option `hdmi`, reporting the state of the HDMI input alongside the other input nodes.
+- `now` no longer shows the format as `?` when the speaker reports no codec, as it does on HDMI. The stream's MIME type is used instead, stripped of its `audio/` and `x-` prefixes and upper-cased, so `audio/mpeg` reads as `MPEG`.
+- Bit rate is now always read as bits per second. Values below 16000 were previously printed unchanged, on the assumption that they were already in kb/s, which turned a genuinely low-bitrate stream into a figure like `15000kb/s`.
+- The internal `call` helper renamed to `http`, and a corrected comment on the sleep timer - _code improvements_.
 
 ## 9.0 - August 2026
 

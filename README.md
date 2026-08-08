@@ -1,4 +1,4 @@
-<!-- v9.0 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v9.1 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -84,6 +84,8 @@ A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). T
 | `shuffle [0..1]`          | Get or set shuffle                              |
 | `repeat [0..2]`           | Get or set repeat                               |
 
+`now` prints artist, title and album on the first line, and position, duration, format, sample rate, bit depth, bit rate and source on the second. Fields the speaker leaves empty show as `?`. When it reports no codec - on HDMI, typically - the format is taken from the stream's MIME type instead, so `audio/mpeg` reads as `MPEG`. Bit rate is read as bits per second and printed in kb/s.
+
 ### Playqueue
 
 | Option  | Description                                     |
@@ -119,6 +121,7 @@ Print all fields, or a single field when given a key.
 | -------------- | ------------------------------------------------ |
 | `bluetooth`    | Bluetooth name, pairing and connection state     |
 | `capabilities` | System capabilities                              |
+| `hdmi`         | HDMI input state                                 |
 | `levels`       | Volume, mute and related levels                  |
 | `network`      | Network status                                   |
 | `nowplaying`   | Raw now playing data                             |

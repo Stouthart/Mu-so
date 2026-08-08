@@ -11,12 +11,6 @@ IFS=$'\n\t'
 
 BASE=http://${MUSO_IP:-mu-so}:15081
 
-# HTTP request - <uri> [method] [output]
-call() {
-  curl -q4fsm2 --noproxy '*' --http1.1 --tcp-fastopen -HUser-Agent: -X"${2:-GET}" \
-    -o "${3:-/dev/null}" "$BASE/$1" || error $?
-}
-
 # Print error and exit - <code>
 error() {
   case $1 in
@@ -29,6 +23,12 @@ error() {
   esac >&2
 
   exit "$1"
+}
+
+# HTTP request - <uri> [method] [output]
+http() {
+  curl -q4fsm2 --noproxy '*' --http1.1 --tcp-fastopen -HUser-Agent: -X"${2:-GET}" \
+    -o "${3:-/dev/null}" "$BASE/$1" || error $?
 }
 
 # List or play items - <ussi> <filter> [index]
@@ -49,8 +49,8 @@ now() {
   local aFields sec tsv i
 
   tsv=$(query nowplaying '[.artistName,.title,.albumName,(.transportPosition|tonumber?)//0,(.duration|tonumber?)//0,
-    .codec,((.sampleRate|tonumber?)//0)/1000,(.bitDepth|tonumber?)//0,
-    ((.bitRate|tonumber?)//0|if.<16000then. else./1000|round end),
+    .codec//(.mimeType//""|ltrimstr("audio/")|ltrimstr("x-")|ascii_upcase),((.sampleRate|tonumber?)//0)/1000,
+    (.bitDepth|tonumber?)//0,(((.bitRate|tonumber?)//0)/1000|round),
     .sourceDetail//(.source//"?"|ltrimstr("inputs/"))]|map(if.==null or.==""then"?"else. end)|@tsv')
   read -ra aFields <<<"$tsv"
 
@@ -69,7 +69,7 @@ number() {
   elif signed "$3" "$4"; then
     local val=${BASH_REMATCH[2]}
     [[ -z ${BASH_REMATCH[1]} ]] || val=$(query "$1" "[((.\"$2\"|tonumber?)//0)${BASH_REMATCH[1]}$val,0,$4]|sort|.[1]")
-    call "$1?$2=$val" PUT
+    http "$1?$2=$val" PUT
   else
     error 200
   fi
@@ -77,7 +77,7 @@ number() {
 
 # JSON request, exits on error - <ussi> <filter>
 query() {
-  call "$1" GET - | jq -cre "$2" || {
+  http "$1" GET - | jq -cre "$2" || {
     set -- "${PIPESTATUS[@]}"
     (($1 == 0)) || exit "$1"
 
@@ -104,7 +104,7 @@ seek() {
     esac
 
     ((val = val < 0 ? 0 : val >= dur ? dur - 1 : val)) || :
-    call "nowplaying?cmd=seek&position=$val"
+    http "nowplaying?cmd=seek&position=$val"
   else
     error 200
   fi
@@ -115,16 +115,16 @@ signed() {
   [[ $1 =~ ^([+-]?)(0|[1-9][0-9]{0,3})$ && ${BASH_REMATCH[2]} -le $2 ]]
 }
 
-# Get, set (min) or cancel (0) sleep timer - <arg>
+# Get, set (min) or cancel (0) sleep timer - [arg]
 sleep() {
   if [[ -z $1 ]]; then
     query alarms 'to_entries[]|select(.key|startswith("sleep"))|"\(.key)=\(.value)"'
   elif signed "$1" 120 && [[ -z ${BASH_REMATCH[1]} ]]; then
     local min=${BASH_REMATCH[2]}
     if ((min)); then
-      call "alarms?sleepPeriod=$((min * 60))&cmd=sleep"
+      http "alarms?sleepPeriod=$((min * 60))&cmd=sleep"
     else
-      call alarms?cmd=cancelSleep
+      http alarms?cmd=cancelSleep
     fi
   else
     error 200
@@ -132,14 +132,14 @@ sleep() {
 }
 
 # Start item - <ussi>
-start() { call "$1?cmd=play"; }
+start() { http "$1?cmd=play"; }
 
 # Usage instructions
 usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v9.0 - Control Naim Mu-so 2 over HTTP
+$nm v9.1 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -164,7 +164,7 @@ Other:
   lighting 0..2 | maxvol 0..100 | roomcomp 0..2 | timeout 0..120
 
 Information:
-  bluetooth | capabilities | levels | network | nowplaying | outputs | power
+  bluetooth | capabilities | hdmi | levels | network | nowplaying | outputs | power
   poweramp | qobuz | spotify | system | tidal | update | wired | wireless
 
 Omit the argument to read the current value.
@@ -184,6 +184,7 @@ arg=${2-}
 case $opt in
 bluetooth) opt=inputs/bluetooth ;;
 capabilities) opt=system/capabilities ;;
+hdmi) opt=inputs/hdmi ;;
 pause) opt=playpause ;;
 poweramp) opt=outputs/poweramp ;;
 qobuz) opt=inputs/qobuz ;;
@@ -199,10 +200,10 @@ sleep)
   sleep "$arg"
   ;;
 standby)
-  call power?system=lona PUT
+  http power?system=lona PUT
   ;;
 wake)
-  call power?system=on PUT
+  http power?system=on PUT
   ;;
 inputs)
   list inputs '.selectable=="1"and.disabled!="1"' "$arg"
@@ -211,7 +212,7 @@ radio | stations)
   list favourites?sort=D:presetID '.stationKey!=null' "$arg"
   ;;
 next | play | playpause | prev | stop)
-  call "nowplaying?cmd=$opt"
+  http "nowplaying?cmd=$opt"
   ;;
 now | info)
   now
@@ -226,7 +227,7 @@ repeat)
   number nowplaying repeat "$arg" 2
   ;;
 clear)
-  call inputs/playqueue?clear=true POST
+  http inputs/playqueue?clear=true POST
   ;;
 queue | playqueue)
   query inputs/playqueue '[.children[]?+{c:.current}]|to_entries[]|
@@ -254,8 +255,8 @@ roomcomp | position)
 timeout | standbyTimeout)
   number power standbyTimeout "$arg" 120
   ;;
-inputs/bluetooth | system/capabilities | levels | network | nowplaying | outputs | power | outputs/poweramp | \
-  inputs/qobuz | inputs/spotify | system | inputs/tidal | update | network/wired | network/wireless)
+inputs/bluetooth | system/capabilities | inputs/hdmi | levels | network | nowplaying | outputs | power | \
+  outputs/poweramp | inputs/qobuz | inputs/spotify | system | inputs/tidal | update | network/wired | network/wireless)
   if [[ -z $arg ]]; then
     query "$opt" 'del(.version,.changestamp,.name,.ussi,.class,.cpu,.children)|to_entries[]|"\(.key)=\(.value)"'
   elif [[ $arg =~ ^[[:alnum:]]{3,24}$ ]]; then
