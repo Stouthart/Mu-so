@@ -68,7 +68,7 @@ number() {
     value "$1" "$2" || error 202
   elif signed "$3" "$4"; then
     local val=${BASH_REMATCH[2]}
-    [[ -z ${BASH_REMATCH[1]} ]] || val=$(query "$1" "[((.\"$2\"|tonumber?)//0)${BASH_REMATCH[1]}$val,0,$4]|sort|.[1]")
+    [[ -z ${BASH_REMATCH[1]} ]] || val=$(query "$1" "[((.\"$2\"|tonumber?)//0)${BASH_REMATCH[0]},0,$4]|sort|.[1]")
     http "$1?$2=$val" PUT
   else
     error 200
