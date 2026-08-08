@@ -1,4 +1,4 @@
-<!-- v9.1 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v9.2 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -66,12 +66,14 @@ A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). T
 
 ### Inputs
 
-| Option            | Description                                                 |
-| ----------------- | ----------------------------------------------------------- |
-| `inputs [1..n]`   | List selectable inputs, or select input _n_                 |
-| `stations [1..n]` | List radio favourites, or play station _n_ (alias: `radio`) |
+| Option            | Description                                 |
+| ----------------- | ------------------------------------------- |
+| `inputs [1..n]`   | List selectable inputs, or select input _n_ |
+| `stations [1..n]` | List radio favourites, or play station _n_  |
 
 `inputs` lists the inputs the speaker reports as selectable and not disabled, numbered from 1. The numbering follows that list, so it shifts if you enable or disable an input in the Naim app. Services the speaker doesn't mark selectable - Qobuz and Tidal, typically - are not listed and cannot be selected this way; use `qobuz` or `tidal` to inspect their state.
+
+`stations` lists the radio favourites in the order you added them, oldest first, so adding one appends it to the end and leaves the existing numbers alone. Lists print in full, but the index you pass back tops out at 99.
 
 ### Playback
 
@@ -88,12 +90,12 @@ A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). T
 
 ### Playqueue
 
-| Option  | Description                                     |
-| ------- | ----------------------------------------------- |
-| `queue` | List the current playqueue (alias: `playqueue`) |
-| `clear` | Empty the playqueue                             |
+| Option         | Description                                                   |
+| -------------- | ------------------------------------------------------------- |
+| `queue [1..n]` | List the playqueue, or jump to track _n_ (alias: `playqueue`) |
+| `clear`        | Empty the playqueue                                           |
 
-The queue is numbered from 1, and the track that is playing is marked with a trailing `*`.
+The queue is numbered from 1, and the current track is marked with a leading `▶`. `queue 5` makes track 5 the current one, so playback continues from there.
 
 ### Audio
 
@@ -167,8 +169,9 @@ msc.sh seek 90               # jump to 1:30
 msc.sh seek +30              # skip forward half a minute
 msc.sh next                  # next track
 
-msc.sh queue                 # 1) Nick Cave / Red Right Hand [Let Love In] *
+msc.sh queue                 # 1) ▶ Nick Cave / Red Right Hand [Let Love In]
                              # 2) Portishead / Roads [Dummy]
+msc.sh queue 2               # jump to Roads
 
 msc.sh now
 # Nick Cave & The Bad Seeds / Red Right Hand [Let Love In]

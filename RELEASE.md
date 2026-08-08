@@ -1,8 +1,18 @@
-<!-- v9.1 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v9.2 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
+
+## 9.2 - August 2026
+
+A playqueue you can navigate, and favourites in the order you added them.
+
+- `queue 1..n` jumps to a track in the playqueue, the way `inputs` and `stations` already select by number. A bare `queue` still prints the list.
+- **The current track in `queue` is now marked with a leading `▶`** in front of the artist, instead of a trailing `*`. Scripts that pick the playing entry out of the list by its trailing marker need changing.
+- **`radio` is gone; the option is `stations`.** It has been an alias since 6.0 moved radio favourites to the plural name, and is now rejected with "Missing or invalid option." **Aliases, cron jobs and Shortcuts still calling `radio` must switch.**
+- **`stations` lists favourites oldest first, in the order they were added, instead of by descending preset ID - so the numbering changes.** Adding a favourite now appends it to the end and leaves the existing numbers alone; previously the highest preset ID came first, so a new favourite could shift everything below it.
+- The helper behind the numeric options renamed from `number` to `setting`, `signed` to `isnum`, and the queue listing moved out of the dispatcher into its own function - _code improvements_.
 
 ## 9.1 - August 2026
 
