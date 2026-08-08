@@ -81,9 +81,8 @@ query() {
 # List or jump to playqueue track - [index]
 queue() {
   if [[ -z $1 ]]; then
-    query inputs/playqueue '[.children[]?+{c:.current}]|to_entries[]|
-      "\(.key+1)) \(if.value.ussi==.value.c
-      then"▶ "else""end)\(.value.artistName//"?") / \(.value.name) [\(.value.albumName//"?")]"' || :
+    query inputs/playqueue '[.children[]?+{c:.current}]|to_entries[]|"\(.key+1)) \(if.value.ussi==.value.c then"> "
+      else""end)\(.value.artistName//"?") / \(.value.name) [\(.value.albumName//"?")]"' || :
   elif [[ $1 =~ ^[1-9][0-9]?$ ]]; then
     local ussi
     ussi=$(query inputs/playqueue "[.children[]?][$1-1].ussi//empty") || error 200
@@ -153,7 +152,7 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v9.2 - Control Naim Mu-so 2 over HTTP
+$nm v9.3 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -162,7 +161,7 @@ Power:
   sleep 0..120 | standby | wake
 
 Inputs:
-  inputs 1..n | stations 1..n
+  inputs 1..n | playlists 1..n | stations 1..n
 
 Playback:
   next | now | pause | play | prev | stop
@@ -172,17 +171,17 @@ Playqueue:
   clear | queue 1..n
 
 Audio:
-  loudness 0..1 | mono 0..1 | mute 0..1 | volume 0..100
+  lipsync 0..50 | loudness 0..1 | mono 0..1 | mute 0..1 | volume 0..100
 
 Other:
-  lighting 0..2 | maxvol 0..100 | roomcomp 0..2 | timeout 0..120
+  autoswitch 0..2 | lighting 0..2 | maxvol 0..100 | roomcomp 0..2 | timeout 0..120
 
 Information:
   bluetooth | capabilities | hdmi | levels | network | nowplaying | outputs
   power | poweramp | qobuz | spotify | system | tidal | update | wired | wireless
 
 Omit the argument to read the current value.
-Numeric arguments accept a relative value (e.g. volume +5, seek -30).
+Numeric settings accept a relative value (e.g. volume +5, seek -30), except sleep.
 Information options accept a key (e.g. levels volume).
 EOF
 }
@@ -222,6 +221,9 @@ wake)
 inputs)
   list inputs '.selectable=="1"and.disabled!="1"' "$arg"
   ;;
+playlists)
+  list favourites?sort=A:timeStamp '.favouriteClass//""|endswith("Playlist")' "$arg"
+  ;;
 stations)
   list favourites?sort=A:timeStamp '.stationKey!=null' "$arg"
   ;;
@@ -246,14 +248,20 @@ clear)
 queue | playqueue)
   queue "$arg"
   ;;
+lipsync)
+  setting inputs/hdmi delay "$arg" 50
+  ;;
 loudness | mono)
   setting outputs "$opt" "$arg" 1
   ;;
 mute)
   setting levels mute "$arg" 1
   ;;
-vol | volume)
+volume | vol)
   setting levels volume "$arg" 100
+  ;;
+autoswitch | autoSwitching)
+  setting inputs/hdmi autoSwitching "$arg" 2
   ;;
 lighting | lightTheme)
   setting userinterface lightTheme "$arg" 2

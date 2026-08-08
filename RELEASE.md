@@ -1,8 +1,18 @@
-<!-- v9.2 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v9.3 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
+
+## 9.3 - August 2026
+
+Playlists from the favourites list, and the HDMI input's own two settings.
+
+- New `playlists 1..n`, listing the playlist favourites and playing one by number, alongside `stations`. It reads the same favourites list, filtered to the entries whose class ends in `Playlist` - the playlists saved from a streaming service or a UPnP server - and numbers them oldest first, as `stations` does.
+- New `lipsync 0..50`, the HDMI audio delay, for lining the sound up with the picture on a connected TV. It writes the `delay` key on the HDMI input, in the same steps the Naim app's lip sync slider uses.
+- New `autoswitch 0..2` (long-form alias: `autoSwitching`), controlling whether the speaker selects the HDMI input by itself when the TV starts sending audio.
+- **The current track in `queue` is now marked with a leading `>` instead of `▶`.** The arrow needed a font that has it and a terminal in the right encoding; a plain `>` survives being piped into anything. **Scripts that pick the playing entry out of the list by the arrow need changing.**
+- The usage screen now says that relative values work everywhere except `sleep`, rather than implying every numeric option takes them - _code improvements_.
 
 ## 9.2 - August 2026
 

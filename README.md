@@ -1,4 +1,4 @@
-<!-- v9.2 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v9.3 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -50,7 +50,7 @@ Add that line to your `~/.zshrc` or `~/.bashrc` to make it permanent. To find th
 msc.sh <option> [argument]
 ```
 
-Numeric options print the current value when called without an argument, and accept a **relative** value prefixed with `+` or `-`. Write numbers without leading zeros - `volume 8`, not `volume 08`. Information options accept a key to print a single field.
+Numeric options print the current value when called without an argument, and accept a **relative** value prefixed with `+` or `-` - `sleep` being the one exception. Write numbers without leading zeros - `volume 8`, not `volume 08`. Information options accept a key to print a single field.
 
 Options that only act - `wake`, `play`, `volume 40` - print nothing at all, whether to a terminal or into a pipe; the exit code tells you whether they worked.
 
@@ -66,14 +66,17 @@ A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). T
 
 ### Inputs
 
-| Option            | Description                                 |
-| ----------------- | ------------------------------------------- |
-| `inputs [1..n]`   | List selectable inputs, or select input _n_ |
-| `stations [1..n]` | List radio favourites, or play station _n_  |
+| Option             | Description                                    |
+| ------------------ | ---------------------------------------------- |
+| `inputs [1..n]`    | List selectable inputs, or select input _n_    |
+| `playlists [1..n]` | List playlist favourites, or play playlist _n_ |
+| `stations [1..n]`  | List radio favourites, or play station _n_     |
 
 `inputs` lists the inputs the speaker reports as selectable and not disabled, numbered from 1. The numbering follows that list, so it shifts if you enable or disable an input in the Naim app. Services the speaker doesn't mark selectable - Qobuz and Tidal, typically - are not listed and cannot be selected this way; use `qobuz` or `tidal` to inspect their state.
 
-`stations` lists the radio favourites in the order you added them, oldest first, so adding one appends it to the end and leaves the existing numbers alone. Lists print in full, but the index you pass back tops out at 99.
+`playlists` and `stations` both read the favourites list, each filtered to its own kind: the favourites whose class ends in `Playlist` - the playlists you saved from a streaming service or a UPnP server - and the radio favourites. Passing an index plays that entry, the same way `stations 2` starts a station.
+
+Both list their favourites in the order you added them, oldest first, so adding one appends it to the end and leaves the existing numbers alone. Lists print in full, but the index you pass back tops out at 99.
 
 ### Playback
 
@@ -95,25 +98,31 @@ A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). T
 | `queue [1..n]` | List the playqueue, or jump to track _n_ (alias: `playqueue`) |
 | `clear`        | Empty the playqueue                                           |
 
-The queue is numbered from 1, and the current track is marked with a leading `▶`. `queue 5` makes track 5 the current one, so playback continues from there.
+The queue is numbered from 1, and the current track is marked with a leading `>`. `queue 5` makes track 5 the current one, so playback continues from there.
 
 ### Audio
 
-| Option            | Description                      |
-| ----------------- | -------------------------------- |
-| `volume [0..100]` | Get or set volume (alias: `vol`) |
-| `mute [0..1]`     | Get or set mute                  |
-| `loudness [0..1]` | Get or set loudness              |
-| `mono [0..1]`     | Get or set mono                  |
+| Option            | Description                             |
+| ----------------- | --------------------------------------- |
+| `volume [0..100]` | Get or set volume (alias: `vol`)        |
+| `mute [0..1]`     | Get or set mute                         |
+| `loudness [0..1]` | Get or set loudness                     |
+| `mono [0..1]`     | Get or set mono                         |
+| `lipsync [0..50]` | Get or set the HDMI audio delay         |
+
+`lipsync` delays the audio to line it up with the picture on a TV connected over HDMI. It writes the `delay` key on the HDMI input, in the same 0..50 steps the Naim app's lip sync slider uses, so it applies to that input only.
 
 ### Other
 
-| Option             | Description                                      |
-| ------------------ | ------------------------------------------------ |
-| `lighting [0..2]`  | Get or set the light theme                       |
-| `maxvol [0..100]`  | Get or set the power amp maximum volume          |
-| `roomcomp [0..2]`  | Get or set room compensation (alias: `position`) |
-| `timeout [0..120]` | Get or set the standby timeout in minutes        |
+| Option              | Description                                      |
+| ------------------- | ------------------------------------------------ |
+| `autoswitch [0..2]` | Get or set HDMI auto switching                   |
+| `lighting [0..2]`   | Get or set the light theme                       |
+| `maxvol [0..100]`   | Get or set the power amp maximum volume          |
+| `roomcomp [0..2]`   | Get or set room compensation (alias: `position`) |
+| `timeout [0..120]`  | Get or set the standby timeout in minutes        |
+
+`autoswitch` controls whether the speaker selects the HDMI input by itself when the TV starts sending audio (long-form alias: `autoSwitching`). Use `hdmi` to see the input's state, including the value these two options write.
 
 ### Information
 
@@ -158,6 +167,10 @@ msc.sh stations              # 1) NPO Radio 2
                              # 3) FIP
 msc.sh stations 2            # play BBC Radio 6 Music
 
+msc.sh playlists             # 1) Sunday Morning
+                             # 2) Late Night Jazz
+msc.sh playlists 1           # play Sunday Morning
+
 msc.sh inputs                # 1) HDMI
                              # 2) Internet Radio
                              # 3) Spotify
@@ -169,7 +182,7 @@ msc.sh seek 90               # jump to 1:30
 msc.sh seek +30              # skip forward half a minute
 msc.sh next                  # next track
 
-msc.sh queue                 # 1) ▶ Nick Cave / Red Right Hand [Let Love In]
+msc.sh queue                 # 1) > Nick Cave / Red Right Hand [Let Love In]
                              # 2) Portishead / Roads [Dummy]
 msc.sh queue 2               # jump to Roads
 
@@ -182,6 +195,8 @@ msc.sh system                # every field as key=value
 msc.sh system hostCpuTemp    # -> 4319 (43.2 degrees)
 msc.sh wireless              # Wi-Fi signal, link quality, SSID
 msc.sh timeout 30            # standby after 30 minutes idle
+msc.sh lipsync 12            # delay the HDMI audio
+msc.sh autoswitch            # -> 1
 
 msc.sh sleep 45              # standby in 45 minutes
 msc.sh sleep                 # -> sleepActive=1
