@@ -1,8 +1,15 @@
-<!-- v9.3 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v9.4 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
+
+## 9.4 - August 2026
+
+Bluetooth pairing without reaching for the app.
+
+- New `pairing 0..1`, putting the speaker into Bluetooth pairing mode so a phone or laptop can discover it, and taking it back out. It writes the `open` key on the Bluetooth input, the one the Naim app's pairing switch uses, and `bluetooth` reports it back alongside the device name and connection state.
+- The `start` helper - renamed from `play` only in 9.0 - is gone again: its single caller now plays the resolved item directly. The usage screen's **Other** section wraps onto a second line to fit the new option - _code improvements_.
 
 ## 9.3 - August 2026
 

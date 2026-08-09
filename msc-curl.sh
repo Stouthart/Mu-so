@@ -43,7 +43,7 @@ list() {
   elif [[ $3 =~ ^[1-9][0-9]?$ ]]; then
     local ussi
     ussi=$(query "$1" "[.children[]?|select($2)][$3-1].ussi//empty") || error 200
-    start "$ussi"
+    http "$ussi?cmd=play"
   else
     error 200
   fi
@@ -144,15 +144,12 @@ sleep() {
   fi
 }
 
-# Start item - <ussi>
-start() { http "$1?cmd=play"; }
-
 # Show usage
 usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v9.3 - Control Naim Mu-so 2 over HTTP
+$nm v9.4 - Control Naim Mu-so 2 over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -174,7 +171,8 @@ Audio:
   lipsync 0..50 | loudness 0..1 | mono 0..1 | mute 0..1 | volume 0..100
 
 Other:
-  autoswitch 0..2 | lighting 0..2 | maxvol 0..100 | roomcomp 0..2 | timeout 0..120
+  autoswitch 0..2 | lighting 0..2 | maxvol 0..100
+  pairing 0..1 | roomcomp 0..2 | timeout 0..120
 
 Information:
   bluetooth | capabilities | hdmi | levels | network | nowplaying | outputs
@@ -268,6 +266,9 @@ lighting | lightTheme)
   ;;
 maxvol | maxVolume)
   setting outputs/poweramp maxVolume "$arg" 100
+  ;;
+pairing)
+  setting inputs/bluetooth open "$arg" 1
   ;;
 roomcomp | position)
   setting outputs position "$arg" 2

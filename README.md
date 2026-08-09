@@ -1,4 +1,4 @@
-<!-- v9.3 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v9.4 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -54,6 +54,8 @@ Numeric options print the current value when called without an argument, and acc
 
 Options that only act - `wake`, `play`, `volume 40` - print nothing at all, whether to a terminal or into a pipe; the exit code tells you whether they worked.
 
+Ranges written as `0..n` are settings; ranges written as `1..n` are positions in a list.
+
 ### Power
 
 | Option           | Description                                               |
@@ -76,7 +78,7 @@ A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). T
 
 `playlists` and `stations` both read the favourites list, each filtered to its own kind: the favourites whose class ends in `Playlist` - the playlists you saved from a streaming service or a UPnP server - and the radio favourites. Passing an index plays that entry, the same way `stations 2` starts a station.
 
-Both list their favourites in the order you added them, oldest first, so adding one appends it to the end and leaves the existing numbers alone. Lists print in full, but the index you pass back tops out at 99.
+Both list their favourites in the order you added them, oldest first, so adding one appends it to the end and leaves the existing numbers alone. Deleting one, on the other hand, renumbers everything after it. Lists print in full, but the index you pass back tops out at 99.
 
 ### Playback
 
@@ -102,27 +104,56 @@ The queue is numbered from 1, and the current track is marked with a leading `>`
 
 ### Audio
 
-| Option            | Description                             |
-| ----------------- | --------------------------------------- |
-| `volume [0..100]` | Get or set volume (alias: `vol`)        |
-| `mute [0..1]`     | Get or set mute                         |
-| `loudness [0..1]` | Get or set loudness                     |
-| `mono [0..1]`     | Get or set mono                         |
-| `lipsync [0..50]` | Get or set the HDMI audio delay         |
+| Option            | Description                      |
+| ----------------- | -------------------------------- |
+| `volume [0..100]` | Get or set volume (alias: `vol`) |
+| `mute [0..1]`     | Get or set mute                  |
+| `loudness [0..1]` | Get or set loudness              |
+| `mono [0..1]`     | Sum both channels to mono        |
+| `lipsync [0..50]` | Get or set the HDMI audio delay  |
 
-`lipsync` delays the audio to line it up with the picture on a TV connected over HDMI. It writes the `delay` key on the HDMI input, in the same 0..50 steps the Naim app's lip sync slider uses, so it applies to that input only.
+`loudness` is the Naim app's **Loudness** switch: it boosts the low frequencies at lower volumes. Note that `capabilities` may report `supportsLoudness=0` while the key on `outputs` is nonetheless live and writable.
+
+`lipsync` is the app's **Auto Lip Sync**: it delays the audio to line it up with the picture on a TV connected over HDMI. It writes the `delay` key on the HDMI input, in milliseconds, in the same 0..50 steps the app's slider uses, so it applies to that input only.
 
 ### Other
 
 | Option              | Description                                      |
 | ------------------- | ------------------------------------------------ |
 | `autoswitch [0..2]` | Get or set HDMI auto switching                   |
-| `lighting [0..2]`   | Get or set the light theme                       |
+| `lighting [0..2]`   | Get or set the front panel light theme           |
 | `maxvol [0..100]`   | Get or set the power amp maximum volume          |
+| `pairing [0..1]`    | Get or set Bluetooth pairing mode                |
 | `roomcomp [0..2]`   | Get or set room compensation (alias: `position`) |
 | `timeout [0..120]`  | Get or set the standby timeout in minutes        |
 
-`autoswitch` controls whether the speaker selects the HDMI input by itself when the TV starts sending audio (long-form alias: `autoSwitching`). Use `hdmi` to see the input's state, including the value these two options write.
+`maxvol` is the app's **Max Volume**, the upper limit of the volume control - useful to keep a stray `volume 100` from shaking the room. `timeout` is **Auto Standby Time**, the number of minutes of inactivity before the speaker puts itself into standby; it is the idle timer, unrelated to the one-off countdown `sleep` arms.
+
+`pairing 1` is the app's **Bluetooth Pairing**: it opens the speaker for pairing so a phone or laptop can discover it, and `pairing 0` closes it again. It writes the `open` key on the Bluetooth input; `bluetooth` reports it back next to the device name and the connection state.
+
+`autoswitch` controls whether the speaker selects the HDMI input by itself when the TV starts sending audio (long-form alias: `autoSwitching`). Use `hdmi` to see the input's state, including the value `autoswitch` and `lipsync` write.
+
+#### roomcomp - Room Compensation
+
+Adjusts the sound to compensate for where the speaker stands in the room, which can noticeably improve the bass.
+
+| Value | Label       | Meaning                                                                   |
+| ----- | ----------- | ------------------------------------------------------------------------- |
+| `0`   | Normal      | Free-standing                                                             |
+| `1`   | Near wall   | Optimal when the Mu-so is positioned close to a wall (less than 25 cm)    |
+| `2`   | Near corner | Optimal when the Mu-so is positioned near a room corner (less than 45 cm) |
+
+#### autoswitch - HDMI Auto Switching
+
+Chooses when the speaker should respond to a connected TV powering on and off.
+
+| Value | Label         | Meaning                                                                         |
+| ----- | ------------- | ------------------------------------------------------------------------------- |
+| `0`   | Off           | Mu-so will not power on or switch to the HDMI input in response to the TV       |
+| `1`   | On HDMI input | Mu-so will power on and off in response to the TV if the HDMI input is selected |
+| `2`   | On any input  | Mu-so will always power on or switch to the HDMI input in response to the TV    |
+
+This only takes effect when the TV powers on or off, so changing it produces no immediately observable result.
 
 ### Information
 
@@ -197,6 +228,11 @@ msc.sh wireless              # Wi-Fi signal, link quality, SSID
 msc.sh timeout 30            # standby after 30 minutes idle
 msc.sh lipsync 12            # delay the HDMI audio
 msc.sh autoswitch            # -> 1
+msc.sh roomcomp 1            # the speaker sits close to a wall
+
+msc.sh pairing 1             # open for Bluetooth pairing
+msc.sh bluetooth             # btName, btConnectState, open, ...
+msc.sh pairing 0             # close it again
 
 msc.sh sleep 45              # standby in 45 minutes
 msc.sh sleep                 # -> sleepActive=1
@@ -284,8 +320,21 @@ Pass `--xdbg` as the very first argument to trace execution with per-line timing
 ## Notes
 
 - The API is undocumented and unofficial. It may change with a firmware update.
-- Requests are plain HTTP on the local network; there is no authentication.
+- Requests are plain HTTP on the local network; there is no authentication. Anything on the same network can control the speaker.
 - Waking from standby takes a few seconds - a command issued immediately after `wake` may still report a server error.
+
+### Device quirks
+
+Behaviour worth knowing about before you build anything on top of these scripts:
+
+- **A `200` response does not mean the write was applied.** The speaker silently discards read-only keys when they are mixed with writable ones, and still answers `200`. Verify by reading the value back.
+- **Reads lag behind writes**, sometimes by several seconds. Volume, seek position, queue position and favourite state all keep reporting the old value for a moment, so a read-back issued immediately after a write will mislead you.
+- **The device can be overwhelmed** by rapid API calls. The warning signs are the `network` node going hollow and `inputs/radio` returning 503. Recovery needs a power cycle - a standby/wake cycle in that state only makes it worse. Space out loops and polling.
+- `stations` and `playlists` fetch roughly 80 KB each, because the speaker offers no server-side filter for favourites and ignores `Accept-Encoding: gzip`. Filtering happens locally, in `jq`.
+
+## Credits
+
+Setting names and descriptions are quoted from the Focal & Naim iOS/macOS app's own localisation file, so the wording here matches what you see in the app.
 
 ## License
 
