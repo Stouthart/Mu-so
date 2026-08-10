@@ -1,8 +1,8 @@
-<!-- v9.4 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v9.5 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
-A small Bash script that controls a **Naim Mu-so 2** from the command line, over your local network. It talks to the speaker's built-in HTTP API on port `15081` - no app, no cloud, no account. Handy for shell aliases, Apple Shortcuts, Stream Deck buttons, Home Assistant `shell_command`, or a cron job that puts the speaker in standby at midnight.
+A small Bash script that controls a **Naim Mu-so 2** from the command line, over your local network. It talks to the speaker's built-in HTTP API on port `15081` - no app, no cloud, no account. Handy for shell aliases, Apple Shortcuts, Stream Deck buttons, or Home Assistant `shell_command`.
 
 Two interchangeable versions are included:
 
@@ -50,21 +50,24 @@ Add that line to your `~/.zshrc` or `~/.bashrc` to make it permanent. To find th
 msc.sh <option> [argument]
 ```
 
-Numeric options print the current value when called without an argument, and accept a **relative** value prefixed with `+` or `-` - `sleep` being the one exception. Write numbers without leading zeros - `volume 8`, not `volume 08`. Information options accept a key to print a single field.
+Numeric options print the current value when called without an argument, and accept a **relative** value prefixed with `+` or `-` - `sleep` being the one exception. Write numbers without leading zeros - `vol 8`, not `vol 08`. Information options accept a key to print a single field.
 
-Options that only act - `wake`, `play`, `volume 40` - print nothing at all, whether to a terminal or into a pipe; the exit code tells you whether they worked.
+Options that only act - `wake`, `play`, `vol 40` - print nothing at all, whether to a terminal or into a pipe; the exit code tells you whether they worked.
 
 Ranges written as `0..n` are settings; ranges written as `1..n` are positions in a list.
 
 ### Power
 
-| Option           | Description                                               |
-| ---------------- | --------------------------------------------------------- |
-| `sleep [0..120]` | Show the sleep timer, set it in minutes, or cancel it (0) |
-| `standby`        | Put the speaker in standby                                |
-| `wake`           | Turn the speaker on                                       |
+| Option                 | Description                                               |
+| ---------------------- | --------------------------------------------------------- |
+| `autostandby [0..120]` | Get or set the idle standby timeout in minutes            |
+| `sleep [0..120]`       | Show the sleep timer, set it in minutes, or cancel it (0) |
+| `standby`              | Put the speaker in standby                                |
+| `wake`                 | Turn the speaker on                                       |
 
-A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). The timer takes whole minutes only - unlike the other numeric options it does not accept a relative `+` or `-` value. It is a one-off countdown, unrelated to the idle standby timeout set with `timeout`.
+`autostandby` is the Naim app's **Auto Standby Time**, the number of minutes of inactivity after which the speaker puts itself into standby (long-form alias: `standbyTimeout`).
+
+A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). The timer takes whole minutes only - unlike the other numeric options it does not accept a relative `+` or `-` value. It is a one-off countdown, unrelated to the idle standby timeout set with `autostandby`.
 
 ### Inputs
 
@@ -82,16 +85,18 @@ Both list their favourites in the order you added them, oldest first, so adding 
 
 ### Playback
 
-| Option                    | Description                                     |
-| ------------------------- | ----------------------------------------------- |
-| `now`                     | Show formatted now playing info (alias: `info`) |
-| `play` / `pause` / `stop` | Transport control                               |
-| `next` / `prev`           | Skip track                                      |
-| `seek [0..3600]`          | Get the position in seconds, or seek to it      |
-| `shuffle [0..1]`          | Get or set shuffle                              |
-| `repeat [0..2]`           | Get or set repeat                               |
+| Option                    | Description                                |
+| ------------------------- | ------------------------------------------ |
+| `now`                     | Show formatted now playing info            |
+| `play` / `pause` / `stop` | Transport control                          |
+| `next` / `prev`           | Skip track                                 |
+| `seek [0..3600]`          | Get the position in seconds, or seek to it |
+| `shuffle [0..1]`          | Get or set shuffle                         |
+| `repeat [0..2]`           | Get or set repeat                          |
 
-`now` prints artist, title and album on the first line, and position, duration, format, sample rate, bit depth, bit rate and source on the second. Fields the speaker leaves empty show as `?`. When it reports no codec - on HDMI, typically - the format is taken from the stream's MIME type instead, so `audio/mpeg` reads as `MPEG`. Bit rate is read as bits per second and printed in kb/s.
+`now` prints artist, title and album on the first line, and position, duration, format, sample rate, bit depth, bit rate and source on the second. Fields the speaker leaves empty are dropped from the first line rather than filled with a placeholder, so a track with no album prints as `Artist / Title`, and one with no artist as the bare title. On radio, where there is no album, the station name is printed in the brackets instead.
+
+On the second line, a format or source the speaker doesn't report shows as `UNKNOWN`. When it reports no codec - on HDMI, typically - the format is taken from the stream's MIME type instead, with the `audio/` prefix stripped, so `audio/mpeg` reads as `mpeg` and `audio/x-flac` as `x-flac`. Bit rate is read as bits per second and printed in kb/s, unrounded, so a stream can read `320.5kb/s`.
 
 ### Playqueue
 
@@ -100,21 +105,18 @@ Both list their favourites in the order you added them, oldest first, so adding 
 | `queue [1..n]` | List the playqueue, or jump to track _n_ (alias: `playqueue`) |
 | `clear`        | Empty the playqueue                                           |
 
-The queue is numbered from 1, and the current track is marked with a leading `>`. `queue 5` makes track 5 the current one, so playback continues from there.
+The queue is numbered from 1, and the current track is marked with a leading `>`. `queue 5` makes track 5 the current one, so playback continues from there. Entries are laid out like the first line of `now`, missing fields and all: an entry the speaker gives no album for is printed without the trailing brackets.
 
 ### Audio
 
-| Option            | Description                      |
-| ----------------- | -------------------------------- |
-| `volume [0..100]` | Get or set volume (alias: `vol`) |
-| `mute [0..1]`     | Get or set mute                  |
-| `loudness [0..1]` | Get or set loudness              |
-| `mono [0..1]`     | Sum both channels to mono        |
-| `lipsync [0..50]` | Get or set the HDMI audio delay  |
+| Option            | Description                         |
+| ----------------- | ----------------------------------- |
+| `vol [0..100]`    | Get or set volume (alias: `volume`) |
+| `mute [0..1]`     | Get or set mute                     |
+| `loudness [0..1]` | Get or set loudness                 |
+| `mono [0..1]`     | Sum both channels to mono           |
 
 `loudness` is the Naim app's **Loudness** switch: it boosts the low frequencies at lower volumes. Note that `capabilities` may report `supportsLoudness=0` while the key on `outputs` is nonetheless live and writable.
-
-`lipsync` is the app's **Auto Lip Sync**: it delays the audio to line it up with the picture on a TV connected over HDMI. It writes the `delay` key on the HDMI input, in milliseconds, in the same 0..50 steps the app's slider uses, so it applies to that input only.
 
 ### Other
 
@@ -122,12 +124,14 @@ The queue is numbered from 1, and the current track is marked with a leading `>`
 | ------------------- | ------------------------------------------------ |
 | `autoswitch [0..2]` | Get or set HDMI auto switching                   |
 | `lighting [0..2]`   | Get or set the front panel light theme           |
+| `lipsync [0..50]`   | Get or set the HDMI audio delay                  |
 | `maxvol [0..100]`   | Get or set the power amp maximum volume          |
 | `pairing [0..1]`    | Get or set Bluetooth pairing mode                |
 | `roomcomp [0..2]`   | Get or set room compensation (alias: `position`) |
-| `timeout [0..120]`  | Get or set the standby timeout in minutes        |
 
-`maxvol` is the app's **Max Volume**, the upper limit of the volume control - useful to keep a stray `volume 100` from shaking the room. `timeout` is **Auto Standby Time**, the number of minutes of inactivity before the speaker puts itself into standby; it is the idle timer, unrelated to the one-off countdown `sleep` arms.
+`maxvol` is the app's **Max Volume**, the upper limit of the volume control - useful to keep a stray `vol 100` from shaking the room.
+
+`lipsync` is the app's **Auto Lip Sync**: it delays the audio to line it up with the picture on a TV connected over HDMI. It writes the `delay` key on the HDMI input, in milliseconds, in the same 0..50 steps the app's slider uses, so it applies to that input only.
 
 `pairing 1` is the app's **Bluetooth Pairing**: it opens the speaker for pairing so a phone or laptop can discover it, and `pairing 0` closes it again. It writes the `open` key on the Bluetooth input; `bluetooth` reports it back next to the device name and the connection state.
 
@@ -186,10 +190,10 @@ Housekeeping keys the API repeats on every node (`version`, `changestamp`, `name
 
 ```bash
 msc.sh wake                  # turn the speaker on
-msc.sh volume                # -> 32
-msc.sh volume 40             # set volume to 40
-msc.sh volume +5             # five louder
-msc.sh volume -10            # and back down
+msc.sh vol                   # -> 32
+msc.sh vol 40                # set volume to 40
+msc.sh vol +5                # five louder
+msc.sh vol -10               # and back down
 msc.sh mute 1                # mute
 msc.sh mute                  # -> 1
 
@@ -221,11 +225,14 @@ msc.sh now
 # Nick Cave & The Bad Seeds / Red Right Hand [Let Love In]
 # 1:23 / 6:11 - FLAC 44.1kHz 16bit 1004kb/s [Qobuz]
 
+msc.sh now                   # on radio, the station fills the brackets
+# Kate Bush / Running Up That Hill [NPO Radio 2]
+
 msc.sh levels volume         # single field -> 40
 msc.sh system                # every field as key=value
 msc.sh system hostCpuTemp    # -> 4319 (43.2 degrees)
 msc.sh wireless              # Wi-Fi signal, link quality, SSID
-msc.sh timeout 30            # standby after 30 minutes idle
+msc.sh autostandby 30        # standby after 30 minutes idle
 msc.sh lipsync 12            # delay the HDMI audio
 msc.sh autoswitch            # -> 1
 msc.sh roomcomp 1            # the speaker sits close to a wall
@@ -244,7 +251,7 @@ msc.sh standby               # goodnight
 Useful shell aliases:
 
 ```bash
-alias vol='msc-curl.sh volume'
+alias vol='msc-curl.sh vol'
 alias np='msc-curl.sh now'
 ```
 
@@ -305,8 +312,8 @@ sudo apt install jq
 | `0`                                            | Success                                                       |
 | `4` (wget) / `6`, `7`, `28`, `52`, `56` (curl) | Network failure - speaker offline, timed out or wrong address |
 | `8` (wget) / `22` (curl)                       | Server error - the speaker is probably in standby             |
-| `200`                                          | Missing or invalid argument                                   |
-| `201`                                          | Missing or invalid option                                     |
+| `200`                                          | Missing or invalid option                                     |
+| `201`                                          | Missing or invalid argument                                   |
 | `202`                                          | The speaker returned something that isn't valid JSON          |
 
 ## Debugging
@@ -314,7 +321,7 @@ sudo apt install jq
 Pass `--xdbg` as the very first argument to trace execution with per-line timings. Requires Bash 5.0 or newer:
 
 ```bash
-./msc.sh --xdbg volume +5
+./msc.sh --xdbg vol +5
 ```
 
 ## Notes

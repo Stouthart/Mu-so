@@ -1,8 +1,24 @@
-<!-- v9.4 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v9.5 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
+
+## 9.5 - August 2026
+
+**The final version.** The scripts do what they set out to do, and no further releases are planned - the API they talk to is the only thing left that can change. Everything below is the last round of polish: cleaner now playing lines, and names that match the app.
+
+- **`timeout` is now `autostandby`.** `standbyTimeout` still works as a long-form alias, but a bare `timeout` is rejected with "Missing or invalid option." The new name says which standby it means - the idle timer the app calls **Auto Standby Time**, not the one-off countdown `sleep` arms. **Aliases and Shortcuts still calling `timeout` must switch.** It also moves to the usage screen's **Power** section, next to `sleep` and `standby`.
+- **`info` is gone; the option is `now`.** It has been an alias since 9.0 renamed it, and is now rejected with "Missing or invalid option."
+- **Exit codes `200` and `201` swapped.** An unknown option now exits `200` and a missing or invalid argument `201`, the order the two are checked in - the option is read before whatever follows it. The messages themselves are unchanged. **Scripts and Shortcuts that branch on the exit code to tell the two apart must switch.**
+- **`now` and `queue` no longer pad missing fields with `?`.** A track the speaker reports no album for prints as `Artist / Title`, without the empty brackets, and one with no artist prints as the bare title. Both are built by one shared jq helper, so a playqueue entry and the first line of `now` are laid out identically. **Scripts that split those lines on `/` or on the brackets need changing.**
+- **On radio, the station name now fills the album brackets** in `now` and `queue`, where a `?` stood before.
+- The second line of `now` reads `UNKNOWN` for the two fields that can genuinely be missing - format and source - rather than `?`.
+- **A format read from the MIME type is no longer upper-cased.** Only the `audio/` prefix is stripped now, so `audio/mpeg` reads as `mpeg` instead of `MPEG`, and `audio/x-flac` keeps its `x-`. It only affects streams the speaker reports no codec for, HDMI in practice.
+- Bit rate is no longer rounded to whole kb/s. A stream reporting 320500 bits per second prints `320.5kb/s` instead of `321kb/s`; rates that are already whole, like `1004kb/s`, are unchanged.
+- `vol` is the documented name for the volume option and `volume` the long-form alias, reading the way `maxvol`/`maxVolume` and `roomcomp`/`position` already do. Both still work, so nothing breaks.
+- `lipsync` moved from the usage screen's **Audio** section to **Other**. It is a setting on the HDMI input, not a speaker-wide audio control, and it sits with `autoswitch`, the other HDMI setting. Behaviour is unchanged.
+- Option aliases collapsed into grouped patterns, the dispatcher put in the same order as the usage screen, the MIME type and `inputs/` prefix stripping moved out of jq into Bash, and the usage screen's title spelled out as "Naim Mu-so 2nd generation" - _code improvements_.
 
 ## 9.4 - August 2026
 
@@ -27,7 +43,7 @@ A playqueue you can navigate, and favourites in the order you added them.
 
 - `queue 1..n` jumps to a track in the playqueue, the way `inputs` and `stations` already select by number. A bare `queue` still prints the list.
 - **The current track in `queue` is now marked with a leading `▶`** in front of the artist, instead of a trailing `*`. Scripts that pick the playing entry out of the list by its trailing marker need changing.
-- **`radio` is gone; the option is `stations`.** It has been an alias since 6.0 moved radio favourites to the plural name, and is now rejected with "Missing or invalid option." **Aliases, cron jobs and Shortcuts still calling `radio` must switch.**
+- **`radio` is gone; the option is `stations`.** It has been an alias since 6.0 moved radio favourites to the plural name, and is now rejected with "Missing or invalid option." **Aliases and Shortcuts still calling `radio` must switch.**
 - **`stations` lists favourites oldest first, in the order they were added, instead of by descending preset ID - so the numbering changes.** Adding a favourite now appends it to the end and leaves the existing numbers alone; previously the highest preset ID came first, so a new favourite could shift everything below it.
 - The helper behind the numeric options renamed from `number` to `setting`, `signed` to `isnum`, and the queue listing moved out of the dispatcher into its own function - _code improvements_.
 
@@ -44,7 +60,7 @@ The HDMI input, and a now playing line that copes without a codec.
 
 More of the speaker readable, and option names that say what they do.
 
-- **`qobuz`, `spotify` and `tidal` no longer switch the input.** They are now information options that report that input's state, in line with the other nodes. Input selection goes through the list instead - `inputs`, then `inputs 1..n`. **Aliases, cron jobs and Shortcuts that call `qobuz`, `spotify` or `tidal` to start playing must be changed**, or they will merely print a block of `key=value` lines. Note that only inputs the speaker marks as selectable are listed: Spotify is, Qobuz and Tidal are not, so for those two there is no direct replacement for the old shortcut.
+- **`qobuz`, `spotify` and `tidal` no longer switch the input.** They are now information options that report that input's state, in line with the other nodes. Input selection goes through the list instead - `inputs`, then `inputs 1..n`. **Aliases and Shortcuts that call `qobuz`, `spotify` or `tidal` to start playing must be changed**, or they will merely print a block of `key=value` lines. Note that only inputs the speaker marks as selectable are listed: Spotify is, Qobuz and Tidal are not, so for those two there is no direct replacement for the old shortcut.
 - Six new information options: `bluetooth` (name, pairing and connection state), `qobuz`, `spotify`, `tidal`, and `wired` / `wireless` for the two network interfaces - signal level, link quality, SSID and the rest.
 - **`max` is now `maxvol`, and `position` is now `roomcomp`.** `maxVolume` and `position` still work as long-form aliases, but a bare `max` is rejected with "Missing or invalid option." The old names read as an adjective and a playback position; the new ones name the setting.
 - `info` is now `now`, which names the `nowplaying` node it reads rather than promising information in general - the other nodes are the ones that print information. `info` still works as an alias, so nothing breaks.
@@ -61,7 +77,7 @@ More of the speaker readable, and option names that say what they do.
 `sleep` became a real sleep timer.
 
 - `sleep` no longer puts the speaker in standby straight away. It now drives the speaker's built-in sleep timer: `sleep 45` sends it to standby in 45 minutes, `sleep 0` cancels a running timer, and a bare `sleep` reports whether one is set and for how long (`sleepActive`, `sleepPeriod` in seconds).
-- `standby` - until now an alias for `sleep` - is the way to put the speaker in standby immediately. **Aliases, cron jobs and Shortcuts that call `sleep` for that must switch to `standby`**, or they will merely arm a timer.
+- `standby` - until now an alias for `sleep` - is the way to put the speaker in standby immediately. **Aliases and Shortcuts that call `sleep` for that must switch to `standby`**, or they will merely arm a timer.
 - The timer accepts whole minutes from 0 to 120. Relative values (`sleep +10`) are rejected with "Missing or invalid argument."
 
 ## 8.3 - August 2026
@@ -126,7 +142,7 @@ Streaming services in one word.
 
 The release that made the script scriptable.
 
-- **5.0** - The interactive picker is gone. `stations` and `inputs` now print a numbered list, and `stations 2` plays an entry directly. Commands no longer block waiting for input, so they work from Shortcuts, cron and Home Assistant.
+- **5.0** - The interactive picker is gone. `stations` and `inputs` now print a numbered list, and `stations 2` plays an entry directly. Commands no longer block waiting for input, so they work from Shortcuts and Home Assistant.
 - **5.0** - Unified error handling with distinct exit codes per failure type.
 - **5.1** - `poweramp` reports the power amplifier settings.
 - **5.2** - `max` sets the maximum volume, `timeout` sets the standby timeout in minutes.

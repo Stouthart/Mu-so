@@ -11,13 +11,16 @@ IFS=$'\n\t'
 
 BASE=http://${MUSO_IP:-mu-so}:15081
 
+# Format "artist / title [album]" - <title-key>
+DESC='def desc(t):[([.artistName,t]-[null,""]|join(" / ")),(.albumName//.station|select(.>"")|"[\(.)]")]|join(" ");'
+
 # Print error and exit - <code>
 error() {
   case $1 in
   4) echo 'Network failure, Mu-so offline?' ;;
   8) echo 'Server error, Mu-so in standby?' ;;
-  200) echo 'Missing or invalid argument.' ;;
-  201) echo 'Missing or invalid option.' ;;
+  200) echo 'Missing or invalid option.' ;;
+  201) echo 'Missing or invalid argument.' ;;
   202) echo 'Invalid response from Mu-so.' ;;
   *) echo "Unexpected wget error $1." ;;
   esac >&2
@@ -42,10 +45,10 @@ list() {
     query "$1" "[.children[]?|select($2)]|to_entries[]|\"\\(.key+1)) \\(.value.name)\"" || :
   elif [[ $3 =~ ^[1-9][0-9]?$ ]]; then
     local ussi
-    ussi=$(query "$1" "[.children[]?|select($2)][$3-1].ussi//empty") || error 200
+    ussi=$(query "$1" "[.children[]?|select($2)][$3-1].ussi//empty") || error 201
     http "$ussi?cmd=play"
   else
-    error 200
+    error 201
   fi
 }
 
@@ -53,23 +56,25 @@ list() {
 now() {
   local aFields i sec tsv
 
-  tsv=$(query nowplaying '[.artistName,.title,.albumName,(.transportPosition|tonumber?)//0,(.duration|tonumber?)//0,
-    .codec//(.mimeType//""|ltrimstr("audio/")|ltrimstr("x-")|ascii_upcase),((.sampleRate|tonumber?)//0)/1000,
-    (.bitDepth|tonumber?)//0,(((.bitRate|tonumber?)//0)/1000|round),
-    .sourceDetail//(.source//"?"|ltrimstr("inputs/"))]|map(if.==null or.==""then"?"else. end)|@tsv')
+  tsv=$(query nowplaying "$DESC"'[desc(.title),(.transportPosition|tonumber?)//0,(.duration|tonumber?)//0,
+    .codec//.mimeType,(.sampleRate|tonumber?)//0,(.bitDepth|tonumber?)//0,(.bitRate|tonumber?)//0,
+    .sourceDetail//.source]|map(if.==null or.==""then"UNKNOWN"else. end)|@tsv')
   read -ra aFields <<<"$tsv"
 
-  for i in 3 4; do
+  for i in 1 2; do
     printf -v sec '%02d' $(((aFields[i] / 1000) % 60))
     aFields[i]=$((aFields[i] / 60000)):$sec
   done
 
-  printf '%s / %s [%s]\n%s / %s - %s %skHz %dbit %dkb/s [%s]\n' "${aFields[@]}"
+  aFields[3]=${aFields[3]#audio/}
+  for i in 4 6; do aFields[i]+=e-3; done
+  aFields[7]=${aFields[7]#inputs/}
+  printf '%s\n%s / %s - %s %gkHz %dbit %gkb/s [%s]\n' "${aFields[@]}"
 }
 
 # Fetch JSON, exit on error - <ussi> <filter>
 query() {
-  http "$1" GET - | jq -cre "$2" || {
+  http "$1" GET - | jq -re "$2" || {
     set -- "${PIPESTATUS[@]}"
     (($1 == 0)) || exit "$1"
 
@@ -81,14 +86,14 @@ query() {
 # List or jump to playqueue track - [index]
 queue() {
   if [[ -z $1 ]]; then
-    query inputs/playqueue '[.children[]?+{c:.current}]|to_entries[]|"\(.key+1)) \(if.value.ussi==.value.c then"> "
-      else""end)\(.value.artistName//"?") / \(.value.name) [\(.value.albumName//"?")]"' || :
+    query inputs/playqueue "$DESC"'[.children[]?+{c:.current}]|to_entries[]|["\(.key+1))",
+      (select(.value.ussi==.value.c)|">"),(.value|desc(.name))]|join(" ")' || :
   elif [[ $1 =~ ^[1-9][0-9]?$ ]]; then
     local ussi
-    ussi=$(query inputs/playqueue "[.children[]?][$1-1].ussi//empty") || error 200
+    ussi=$(query inputs/playqueue "[.children[]?][$1-1].ussi//empty") || error 201
     http "inputs/playqueue?current=$ussi" PUT
   else
-    error 200
+    error 201
   fi
 }
 
@@ -111,7 +116,7 @@ seek() {
     ((val = val < 0 ? 0 : val >= dur ? dur - 1 : val)) || :
     http "nowplaying?cmd=seek&position=$val"
   else
-    error 200
+    error 201
   fi
 }
 
@@ -124,7 +129,7 @@ setting() {
     [[ -z ${BASH_REMATCH[1]} ]] || val=$(query "$1" "[((.\"$2\"|tonumber?)//0)${BASH_REMATCH[0]},0,$4]|sort|.[1]")
     http "$1?$2=$val" PUT
   else
-    error 200
+    error 201
   fi
 }
 
@@ -140,7 +145,7 @@ sleep() {
       http alarms?cmd=cancelSleep
     fi
   else
-    error 200
+    error 201
   fi
 }
 
@@ -149,37 +154,37 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v9.4 - Control Naim Mu-so 2 over HTTP
+$nm v9.5 - Control Naim Mu-so 2nd generation over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
 
 Power:
-  sleep 0..120 | standby | wake
+  autostandby 0..120 | sleep 0..120 | standby | wake
 
 Inputs:
   inputs 1..n | playlists 1..n | stations 1..n
 
 Playback:
   next | now | pause | play | prev | stop
-  seek 0..3600 | shuffle 0..1 | repeat 0..2
+  repeat 0..2 | seek 0..3600 | shuffle 0..1
 
 Playqueue:
   clear | queue 1..n
 
 Audio:
-  lipsync 0..50 | loudness 0..1 | mono 0..1 | mute 0..1 | volume 0..100
+  loudness 0..1 | mono 0..1 | mute 0..1 | vol 0..100
 
 Other:
-  autoswitch 0..2 | lighting 0..2 | maxvol 0..100
-  pairing 0..1 | roomcomp 0..2 | timeout 0..120
+  autoswitch 0..2 | lighting 0..2 | lipsync 0..50
+  maxvol 0..100 | pairing 0..1 | roomcomp 0..2
 
 Information:
   bluetooth | capabilities | hdmi | levels | network | nowplaying | outputs
   power | poweramp | qobuz | spotify | system | tidal | update | wired | wireless
 
 Omit the argument to read the current value.
-Numeric settings accept a relative value (e.g. volume +5, seek -30), except sleep.
+Numeric settings accept a relative value (e.g. vol +5, seek -30), except sleep.
 Information options accept a key (e.g. levels volume).
 EOF
 }
@@ -187,26 +192,34 @@ EOF
 # Get single JSON value - <ussi> <key>
 value() { query "$1" ".\"$2\"//empty"; }
 
-(($# < 3)) || error 200
+(($# < 3)) || error 201
 opt=${1-}
 arg=${2-}
 
 # Option aliases
 case $opt in
-bluetooth) opt=inputs/bluetooth ;;
-capabilities) opt=system/capabilities ;;
-hdmi) opt=inputs/hdmi ;;
-pause) opt=playpause ;;
-poweramp) opt=outputs/poweramp ;;
-qobuz) opt=inputs/qobuz ;;
-spotify) opt=inputs/spotify ;;
-tidal) opt=inputs/tidal ;;
-wired) opt=network/wired ;;
-wireless) opt=network/wireless ;;
+bluetooth | hdmi | qobuz | spotify | tidal)
+  opt=inputs/$opt
+  ;;
+wired | wireless)
+  opt=network/$opt
+  ;;
+capabilities)
+  opt=system/capabilities
+  ;;
+poweramp)
+  opt=outputs/poweramp
+  ;;
+pause)
+  opt=playpause
+  ;;
 esac
 
 # Main dispatcher
 case $opt in
+autostandby | standbyTimeout)
+  setting power standbyTimeout "$arg" 120
+  ;;
 sleep)
   sleep "$arg"
   ;;
@@ -228,8 +241,11 @@ stations)
 next | play | playpause | prev | stop)
   http "nowplaying?cmd=$opt"
   ;;
-now | info)
+now)
   now
+  ;;
+repeat)
+  setting nowplaying repeat "$arg" 2
   ;;
 seek)
   seek "$arg"
@@ -237,17 +253,11 @@ seek)
 shuffle)
   setting nowplaying shuffle "$arg" 1
   ;;
-repeat)
-  setting nowplaying repeat "$arg" 2
-  ;;
 clear)
   http inputs/playqueue?clear=true POST
   ;;
 queue | playqueue)
   queue "$arg"
-  ;;
-lipsync)
-  setting inputs/hdmi delay "$arg" 50
   ;;
 loudness | mono)
   setting outputs "$opt" "$arg" 1
@@ -255,7 +265,7 @@ loudness | mono)
 mute)
   setting levels mute "$arg" 1
   ;;
-volume | vol)
+vol | volume)
   setting levels volume "$arg" 100
   ;;
 autoswitch | autoSwitching)
@@ -263,6 +273,9 @@ autoswitch | autoSwitching)
   ;;
 lighting | lightTheme)
   setting userinterface lightTheme "$arg" 2
+  ;;
+lipsync)
+  setting inputs/hdmi delay "$arg" 50
   ;;
 maxvol | maxVolume)
   setting outputs/poweramp maxVolume "$arg" 100
@@ -273,9 +286,6 @@ pairing)
 roomcomp | position)
   setting outputs position "$arg" 2
   ;;
-timeout | standbyTimeout)
-  setting power standbyTimeout "$arg" 120
-  ;;
 inputs/bluetooth | system/capabilities | inputs/hdmi | levels | network | nowplaying | outputs | power | \
   outputs/poweramp | inputs/qobuz | inputs/spotify | system | inputs/tidal | update | network/wired | network/wireless)
   if [[ -z $arg ]]; then
@@ -283,14 +293,18 @@ inputs/bluetooth | system/capabilities | inputs/hdmi | levels | network | nowpla
   elif [[ $arg =~ ^[[:alnum:]]{3,24}$ ]]; then
     value "$opt" "$arg" || :
   else
-    error 200
+    error 201
   fi
   ;;
 '' | -h | --help | help)
   usage
   ;;
+--dump)
+  [[ $arg =~ ^[[:alnum:]/:_-]+(\?[[:alnum:]=\&:%.,_-]+)?$ ]] || error 201
+  query "$arg" . || error 202
+  ;;
 *)
-  error 201
+  error 200
   ;;
 esac
 
