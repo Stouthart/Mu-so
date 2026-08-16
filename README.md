@@ -1,4 +1,4 @@
-<!-- v9.5 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v10.0 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -12,6 +12,8 @@ Two interchangeable versions are included:
 | `msc-curl.sh` | `curl` | macOS and Git Bash on Windows (`curl` is preinstalled)  |
 
 Both take the same options and behave identically - pick whichever tool you already have.
+
+This is **v10.0**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new.
 
 ## Requirements
 
@@ -131,9 +133,9 @@ The queue is numbered from 1, and the current track is marked with a leading `>`
 
 `maxvol` is the app's **Max Volume**, the upper limit of the volume control - useful to keep a stray `vol 100` from shaking the room.
 
-`lipsync` is the app's **Auto Lip Sync**: it delays the audio to line it up with the picture on a TV connected over HDMI. It writes the `delay` key on the HDMI input, in milliseconds, in the same 0..50 steps the app's slider uses, so it applies to that input only.
+`lipsync` is the app's **Auto Lip Sync**: it delays the audio to line it up with the picture on a TV connected over HDMI. It writes the `delay` key on the HDMI input, in milliseconds, in the same 0..50 steps the app's slider uses, so it applies to that input only (long-form alias: `delay`).
 
-`pairing 1` is the app's **Bluetooth Pairing**: it opens the speaker for pairing so a phone or laptop can discover it, and `pairing 0` closes it again. It writes the `open` key on the Bluetooth input; `bluetooth` reports it back next to the device name and the connection state.
+`pairing 1` is the app's **Bluetooth Pairing**: it opens the speaker for pairing so a phone or laptop can discover it, and `pairing 0` closes it again. It writes the `open` key on the Bluetooth input (long-form alias: `open`); `bluetooth` reports it back next to the device name and the connection state.
 
 `autoswitch` controls whether the speaker selects the HDMI input by itself when the TV starts sending audio (long-form alias: `autoSwitching`). Use `hdmi` to see the input's state, including the value `autoswitch` and `lipsync` write.
 

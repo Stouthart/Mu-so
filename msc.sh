@@ -2,7 +2,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-[[ ${1-} == --xdbg ]] && { # Bash >= v5.0
+[[ ${1-} == --xdbg ]] && { # Bash >= 5.0
   shift
   PS4='+\e[5G\e[36m$(((${EPOCHREALTIME/./}-_ERT)/1000))\e[9G\e[33m$LINENO\e[13G\e[90m>\e[15G\e[m'
   readonly _ERT=${EPOCHREALTIME/./}
@@ -16,15 +16,18 @@ DESC='def desc(t):[([.artistName,t]-[null,""]|join(" / ")),(.albumName//.station
 
 # Print error and exit - <code>
 error() {
-  case $1 in
-  4) echo 'Network failure, Mu-so offline?' ;;
-  8) echo 'Server error, Mu-so in standby?' ;;
-  200) echo 'Missing or invalid option.' ;;
-  201) echo 'Missing or invalid argument.' ;;
-  202) echo 'Invalid response from Mu-so.' ;;
-  *) echo "Unexpected wget error $1." ;;
-  esac >&2
+  local msg
 
+  case $1 in
+  4) msg='Network failure, Mu-so offline?' ;;
+  8) msg='Server error, Mu-so in standby?' ;;
+  200) msg='Missing or invalid option.' ;;
+  201) msg='Missing or invalid argument.' ;;
+  202) msg='Invalid response from Mu-so.' ;;
+  *) msg="Unexpected wget error $1." ;;
+  esac
+
+  printf '%s\n' "$msg" >&2
   exit "$1"
 }
 
@@ -154,7 +157,7 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v9.5 - Control Naim Mu-so 2nd generation over HTTP
+$nm v10.0 - Control Naim Mu-so 2nd generation over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -198,11 +201,11 @@ arg=${2-}
 
 # Option aliases
 case $opt in
+pause)
+  opt=playpause
+  ;;
 bluetooth | hdmi | qobuz | spotify | tidal)
   opt=inputs/$opt
-  ;;
-wired | wireless)
-  opt=network/$opt
   ;;
 capabilities)
   opt=system/capabilities
@@ -210,8 +213,8 @@ capabilities)
 poweramp)
   opt=outputs/poweramp
   ;;
-pause)
-  opt=playpause
+wired | wireless)
+  opt=network/$opt
   ;;
 esac
 
@@ -274,13 +277,13 @@ autoswitch | autoSwitching)
 lighting | lightTheme)
   setting userinterface lightTheme "$arg" 2
   ;;
-lipsync)
+lipsync | delay)
   setting inputs/hdmi delay "$arg" 50
   ;;
 maxvol | maxVolume)
   setting outputs/poweramp maxVolume "$arg" 100
   ;;
-pairing)
+pairing | open)
   setting inputs/bluetooth open "$arg" 1
   ;;
 roomcomp | position)
@@ -300,7 +303,7 @@ inputs/bluetooth | system/capabilities | inputs/hdmi | levels | network | nowpla
   usage
   ;;
 --dump)
-  [[ $arg =~ ^[[:alnum:]/:_-]+(\?[[:alnum:]=\&:%.,_-]+)?$ ]] || error 201
+  [[ $arg =~ ^[[:alnum:]/:_-]+$ ]] || error 201
   query "$arg" . || error 202
   ;;
 *)

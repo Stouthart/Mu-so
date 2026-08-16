@@ -1,12 +1,21 @@
-<!-- v9.5 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v10.0 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
 
+10.0 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 10.0 is where you started.
+
+## 10.0 - August 2026
+
+**The version that goes out.** 9.5 was meant to be the end of it, and in behaviour it nearly was. What was left is the naming: the last two options without a long-form name now have one, so every option in the script reads the same way.
+
+- **`lipsync` and `pairing` now have long-form aliases: `delay` and `open`.** Each is the name of the key the option writes - `delay` on the HDMI input, `open` on the Bluetooth input - the way `roomcomp`/`position` and `autostandby`/`standbyTimeout` already read. The short names remain the documented ones, and both spellings work, so nothing breaks.
+- Error messages collected into one variable and printed with a single `printf` rather than a `case` of `echo`s, and the option aliases put in dispatcher order - _code improvements_.
+
 ## 9.5 - August 2026
 
-**The final version.** The scripts do what they set out to do, and no further releases are planned - the API they talk to is the only thing left that can change. Everything below is the last round of polish: cleaner now playing lines, and names that match the app.
+The scripts do what they set out to do, and this is the round of polish that says so: cleaner now playing lines, and names that match the app.
 
 - **`timeout` is now `autostandby`.** `standbyTimeout` still works as a long-form alias, but a bare `timeout` is rejected with "Missing or invalid option." The new name says which standby it means - the idle timer the app calls **Auto Standby Time**, not the one-off countdown `sleep` arms. **Aliases and Shortcuts still calling `timeout` must switch.** It also moves to the usage screen's **Power** section, next to `sleep` and `standby`.
 - **`info` is gone; the option is `now`.** It has been an alias since 9.0 renamed it, and is now rejected with "Missing or invalid option."
