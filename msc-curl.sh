@@ -4,7 +4,7 @@ IFS=$'\n\t'
 
 [[ ${1-} == --xdbg ]] && { # Bash >= 5.0
   shift
-  PS4='+\e[5G\e[36m$(((${EPOCHREALTIME/./}-_ERT)/1000))\e[9G\e[33m$LINENO\e[13G\e[90m>\e[15G\e[m'
+  PS4='+\e[5G\e[36m$(((${EPOCHREALTIME/./}-_ERT+500)/1000))\e[9G\e[33m$LINENO\e[13G\e[90m>\e[15G\e[m'
   readonly _ERT=${EPOCHREALTIME/./}
   set -x
 }
@@ -13,6 +13,28 @@ BASE=http://${MUSO_IP:-mu-so}:15081
 
 # Format "artist / title [album]" - <title-key>
 DESC='def desc(t):[([.artistName,t]-[null,""]|join(" / ")),(.albumName//.station|select(.>"")|"[\(.)]")]|join(" ");'
+
+# Replace the playqueue with a URL and start it - <url>
+add() {
+  local mime name
+
+  [[ $1 =~ ^https?://[^[:space:]]+\.[[:alnum:]]{2,4}$ ]] || error 201
+  name=${1##*/} name=${name%.*}
+  printf -v name '%b' "${name//\*/\\x}" # Display name only - minimServer escapes bytes as *XX
+
+  case $1 in
+  *.aif | *.aiff) mime=audio/x-aiff ;;
+  *.dff) mime=audio/x-dff ;;
+  *.dsf) mime=audio/x-dsf ;;
+  *.flac) mime=audio/x-flac ;;
+  *.m4a) mime=audio/mp4 ;;
+  *.wav) mime=audio/x-wav ;;
+  *) mime=audio/mpeg ;;
+  esac
+
+  http 'inputs/playqueue?where=end&clear=true&current=0&play=true' POST /dev/null "$(jq -cn --arg n "${name//_/ }" \
+    --arg t "$mime" --arg u "$1" '[{class:"object.track.upnp",name:$n,mimeType:$t,uri:$u}]')"
+}
 
 # Print error and exit - <code>
 error() {
@@ -31,10 +53,10 @@ error() {
   exit "$1"
 }
 
-# HTTP request - <uri> [method] [output]
+# HTTP request - <uri> [method] [output] [body]
 http() {
-  curl -q4fsm2 --noproxy '*' --http1.1 --tcp-fastopen -HUser-Agent: -X"${2:-GET}" \
-    -o "${3:-/dev/null}" "$BASE/$1" || error $?
+  curl -q -s --noproxy '*' -4 --tcp-fastopen -m2 -HUser-Agent: -f \
+    -X"${2:-GET}" -o "${3:-/dev/null}" ${4:+-d"$4"} "$BASE/$1" || error $?
 }
 
 # Valid number within max? Sets BASH_REMATCH - <arg> <max>
@@ -42,13 +64,14 @@ isnum() {
   [[ $1 =~ ^([+-]?)(0|[1-9][0-9]{0,3})$ && ${BASH_REMATCH[2]} -le $2 ]]
 }
 
-# List or start items - <ussi> <filter> [index]
+# List or start items - <uri> <filter> [index]
 list() {
   if [[ -z $3 ]]; then
     query "$1" "[.children[]?|select($2)]|to_entries[]|\"\\(.key+1)) \\(.value.name)\"" || :
   elif [[ $3 =~ ^[1-9][0-9]?$ ]]; then
     local ussi
-    ussi=$(query "$1" "[.children[]?|select($2)][$3-1].ussi//empty") || error 201
+    ussi=$(query "$1" "[.children[]?|select($2)][$3-1].ussi//\"\"") || exit $?
+    [[ -n $ussi ]] || error 201
     http "$ussi?cmd=play"
   else
     error 201
@@ -70,19 +93,20 @@ now() {
   done
 
   aFields[3]=${aFields[3]#audio/}
-  for i in 4 6; do aFields[i]+=e-3; done
+  aFields[4]+=e-3 aFields[6]+=e-3
   aFields[7]=${aFields[7]#inputs/}
   printf '%s\n%s / %s - %s %gkHz %dbit %gkb/s [%s]\n' "${aFields[@]}"
 }
 
-# Fetch JSON, exit on error - <ussi> <filter>
+# Fetch JSON, exit on error - <uri> <filter>
 query() {
-  http "$1" GET - | jq -re "$2" || {
-    set -- "${PIPESTATUS[@]}"
-    (($1 == 0)) || exit "$1"
+  local json rc
+  json=$(http "$1" GET -) || exit $?
 
-    case $2 in 2 | 3 | 5) error 202 ;; esac
-    return "$2"
+  jq -re "$2" <<<"$json" || {
+    rc=$?
+    case $rc in 2 | 3 | 5) error 202 ;; esac
+    return $rc
   }
 }
 
@@ -93,7 +117,8 @@ queue() {
       (select(.value.ussi==.value.c)|">"),(.value|desc(.name))]|join(" ")' || :
   elif [[ $1 =~ ^[1-9][0-9]?$ ]]; then
     local ussi
-    ussi=$(query inputs/playqueue "[.children[]?][$1-1].ussi//empty") || error 201
+    ussi=$(query inputs/playqueue "[.children[]?][$1-1].ussi//\"\"") || exit $?
+    [[ -n $ussi ]] || error 201
     http "inputs/playqueue?current=$ussi" PUT
   else
     error 201
@@ -123,7 +148,7 @@ seek() {
   fi
 }
 
-# Get, set or adjust (±) a setting - <ussi> <key> <arg> <max>
+# Get, set or adjust (±) a setting - <ussi> <key> [arg] <max>
 setting() {
   if [[ -z $3 ]]; then
     value "$1" "$2" || error 202
@@ -137,7 +162,7 @@ setting() {
 }
 
 # Get, set (min) or cancel (0) sleep timer - [arg]
-sleep() {
+timer() {
   if [[ -z $1 ]]; then
     query alarms 'to_entries[]|select(.key|startswith("sleep"))|"\(.key)=\(.value)"'
   elif isnum "$1" 120 && [[ -z ${BASH_REMATCH[1]} ]]; then
@@ -157,7 +182,7 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v10.0 - Control Naim Mu-so 2nd generation over HTTP
+$nm v10.1 - Control Naim Mu-so 2nd generation over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -169,11 +194,11 @@ Inputs:
   inputs 1..n | playlists 1..n | stations 1..n
 
 Playback:
-  next | now | pause | play | prev | stop
+  next | notes | now | pause | play | prev | stop
   repeat 0..2 | seek 0..3600 | shuffle 0..1
 
 Playqueue:
-  clear | queue 1..n
+  add URL | clear | queue 1..n
 
 Audio:
   loudness 0..1 | mono 0..1 | mute 0..1 | vol 0..100
@@ -188,6 +213,7 @@ Information:
 
 Omit the argument to read the current value.
 Numeric settings accept a relative value (e.g. vol +5, seek -30), except sleep.
+Add replaces the playqueue with an escaped URL and starts it.
 Information options accept a key (e.g. levels volume).
 EOF
 }
@@ -224,7 +250,7 @@ autostandby | standbyTimeout)
   setting power standbyTimeout "$arg" 120
   ;;
 sleep)
-  sleep "$arg"
+  timer "$arg"
   ;;
 standby)
   http power?system=lona PUT
@@ -244,6 +270,9 @@ stations)
 next | play | playpause | prev | stop)
   http "nowplaying?cmd=$opt"
   ;;
+notes | description)
+  query nowplaying '.description//empty|gsub("\r";"")' || :
+  ;;
 now)
   now
   ;;
@@ -255,6 +284,9 @@ seek)
   ;;
 shuffle)
   setting nowplaying shuffle "$arg" 1
+  ;;
+add)
+  add "$arg"
   ;;
 clear)
   http inputs/playqueue?clear=true POST

@@ -1,4 +1,4 @@
-<!-- v10.0 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v10.1 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -13,7 +13,7 @@ Two interchangeable versions are included:
 
 Both take the same options and behave identically - pick whichever tool you already have.
 
-This is **v10.0**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new.
+This is **v10.1**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new.
 
 ## Requirements
 
@@ -56,7 +56,7 @@ Numeric options print the current value when called without an argument, and acc
 
 Options that only act - `wake`, `play`, `vol 40` - print nothing at all, whether to a terminal or into a pipe; the exit code tells you whether they worked.
 
-Ranges written as `0..n` are settings; ranges written as `1..n` are positions in a list.
+Ranges written as `0..n` are settings; ranges written as `1..n` are positions in a list. `add` is the one option whose argument is neither a number nor a key, but a URL.
 
 ### Power
 
@@ -87,27 +87,55 @@ Both list their favourites in the order you added them, oldest first, so adding 
 
 ### Playback
 
-| Option                    | Description                                |
-| ------------------------- | ------------------------------------------ |
-| `now`                     | Show formatted now playing info            |
-| `play` / `pause` / `stop` | Transport control                          |
-| `next` / `prev`           | Skip track                                 |
-| `seek [0..3600]`          | Get the position in seconds, or seek to it |
-| `shuffle [0..1]`          | Get or set shuffle                         |
-| `repeat [0..2]`           | Get or set repeat                          |
+| Option                    | Description                                                |
+| ------------------------- | ---------------------------------------------------------- |
+| `now`                     | Show formatted now playing info                            |
+| `notes`                   | Show notes for the current track (alias: `description`)    |
+| `play` / `pause` / `stop` | Transport control                                          |
+| `next` / `prev`           | Skip track                                                 |
+| `seek [0..3600]`          | Get the position in seconds, or seek to it                 |
+| `shuffle [0..1]`          | Get or set shuffle                                         |
+| `repeat [0..2]`           | Get or set repeat                                          |
 
 `now` prints artist, title and album on the first line, and position, duration, format, sample rate, bit depth, bit rate and source on the second. Fields the speaker leaves empty are dropped from the first line rather than filled with a placeholder, so a track with no album prints as `Artist / Title`, and one with no artist as the bare title. On radio, where there is no album, the station name is printed in the brackets instead.
 
 On the second line, a format or source the speaker doesn't report shows as `UNKNOWN`. When it reports no codec - on HDMI, typically - the format is taken from the stream's MIME type instead, with the `audio/` prefix stripped, so `audio/mpeg` reads as `mpeg` and `audio/x-flac` as `x-flac`. Bit rate is read as bits per second and printed in kb/s, unrounded, so a stream can read `320.5kb/s`.
 
+`notes` prints the description the speaker holds for the track that is playing - the show notes, which on a podcast is often the full tracklist (long-form alias: `description`). It is not read from the file, nor from the server that supplied it: the speaker enriches it from Naim's own online metadata service, so it appears a moment after playback starts, and only for content that service recognises. When there is nothing to show, `notes` prints nothing and succeeds. Carriage returns the speaker embeds are stripped, so the text pastes cleanly into a terminal or a pipe. It covers the current track only - there is no per-entry equivalent for the playqueue.
+
 ### Playqueue
 
 | Option         | Description                                                   |
 | -------------- | ------------------------------------------------------------- |
+| `add URL`      | Replace the playqueue with _URL_ and start playing            |
 | `queue [1..n]` | List the playqueue, or jump to track _n_ (alias: `playqueue`) |
 | `clear`        | Empty the playqueue                                           |
 
 The queue is numbered from 1, and the current track is marked with a leading `>`. `queue 5` makes track 5 the current one, so playback continues from there. Entries are laid out like the first line of `now`, missing fields and all: an entry the speaker gives no album for is printed without the trailing brackets.
+
+#### add - Play a URL
+
+`add` plays a file the speaker can reach over HTTP - typically one served by a UPnP server such as minimServer, but any reachable URL will do. It is the call the Naim app makes to play from a server, and it does the whole thing in one request: the playqueue is emptied, the URL becomes its only entry, and playback starts. Despite the name it does not append; use it as "play this now".
+
+The URL must be a plain `http://` or `https://` address ending in a file extension of two to four characters. Anything else is rejected with "Missing or invalid argument."
+
+**Pass the URL exactly as the server expects it - the script does not escape it.** minimServer is the trap here: it escapes unsafe bytes in a filename as `*` followed by two hex digits rather than percent-encoding them, so an accented filename has to be written `P*C3*A1pa`, not `P%C3%A1pa`.
+
+The display name is derived from the URL's last segment: the extension is dropped, `*XX` escapes are decoded back to the characters they stand for, and underscores become spaces. So `.../Resident_1234_P*C3*A1pa.flac` shows up in the queue as `Resident 1234 Pápa`.
+
+The MIME type is derived from the extension, because the speaker needs it: without a matching type the track still plays, but it reports a `0:00` duration and seeking does nothing.
+
+| Extension        | MIME type      |
+| ---------------- | --------------- |
+| `.aif` / `.aiff` | `audio/x-aiff` |
+| `.dff`           | `audio/x-dff`  |
+| `.dsf`           | `audio/x-dsf`  |
+| `.flac`          | `audio/x-flac` |
+| `.m4a`           | `audio/mp4`    |
+| `.wav`           | `audio/x-wav`  |
+| anything else    | `audio/mpeg`   |
+
+The fallback makes `.mp3` work without an entry of its own; an extension that is genuinely something else falls back with it, plays, and loses duration and seek.
 
 ### Audio
 
@@ -222,6 +250,11 @@ msc.sh next                  # next track
 msc.sh queue                 # 1) > Nick Cave / Red Right Hand [Let Love In]
                              # 2) Portishead / Roads [Dummy]
 msc.sh queue 2               # jump to Roads
+
+msc.sh add 'http://192.168.1.9:9790/minimserver/*/Podcasts/Resident_1234_P*C3*A1pa.mp3'
+                             # clears the queue and plays it
+msc.sh notes                 # the episode's tracklist, if Naim has it
+msc.sh clear                 # empty the queue again
 
 msc.sh now
 # Nick Cave & The Bad Seeds / Red Right Hand [Let Love In]

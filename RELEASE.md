@@ -1,10 +1,20 @@
-<!-- v10.0 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v10.1 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
 
-10.0 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 10.0 is where you started.
+10.1 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 10.1 is where you started.
+
+## 10.1 - August 2026
+
+Two things the speaker already knew and the script never asked it for: any URL it can reach, played on the spot, and the notes behind the track that is playing.
+
+- **New `add URL`**, which empties the playqueue, puts one URL in it and starts playing - the call the Naim app makes to play a file from a UPnP server, and the reason the playqueue can now hold something the app didn't put there. It is a single request rather than a clear, an append and a play. The display name comes from the last segment of the URL, with the extension dropped, minimServer's `*XX` byte escapes decoded and underscores turned into spaces. The URL itself is sent as given - it has to arrive escaped the way the serving side expects, which for minimServer means `*XX` and not percent-encoding.
+- **The MIME type behind `add` is derived from the file extension**, because the speaker needs one: `.flac`, `.dsf`, `.m4a`, `.wav`, `.aif`/`.aiff` and `.dff` each get their own, and everything else falls back to `audio/mpeg`, which covers `.mp3`. A track sent with the wrong type still plays, but reports a `0:00` duration and won't seek.
+- **New `notes`** (long-form alias: `description`), printing the description the speaker holds for the current track - show notes, and on a podcast often the full tracklist. It doesn't come from the file or from the server that served it: the speaker enriches it from Naim's own online metadata service, so it appears a moment into playback and only for content that service recognises. Nothing to show prints nothing and succeeds, and the carriage returns the speaker embeds are stripped.
+- **A network failure while resolving `stations 2`, `playlists 1` or `queue 5` is reported for what it is.** The lookup runs in a subshell, so the `exit` that should have ended the script only ended the subshell: the real message ("Mu-so offline?") was printed, then followed by "Missing or invalid argument." and exit 201, whatever had actually gone wrong. The genuine exit code now propagates, and 201 is left to mean what it says - an index outside the list. **Scripts that read 201 from those three options as "unreachable" need changing.**
+- The internal `sleep` helper renamed to `timer`, so it no longer shadows the shell's own `sleep`; the HTTP helper in both versions gained a fourth parameter for a request body, which is what `add` posts; the `wget` and `curl` invocations were cut back to the flags that measurably earn their place, `curl` no longer pinning `--http1.1` and `wget` no longer passing `--no-iri`, neither of which changed what goes over the wire to the speaker; and the `--xdbg` trace rounds its millisecond timings instead of truncating them - _code improvements_.
 
 ## 10.0 - August 2026
 
