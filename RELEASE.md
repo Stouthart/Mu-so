@@ -1,10 +1,19 @@
-<!-- v10.1 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v10.2 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
 
-10.1 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 10.1 is where you started.
+10.2 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 10.2 is where you started.
+
+## 10.2 - August 2026
+
+A track position written the way it is read back.
+
+- **`seek` now takes a `min:sec` position as well as a number of seconds.** `seek 3:39` is `seek 219`, so the figure `now` prints as `3:39` can be typed straight back in without doing the arithmetic. The seconds are always two digits (`3:09`, not `3:9`); the minutes may be written either way.
+- **The relative `+` and `-` work on that form too**, so `seek -1:30` rewinds a minute and a half and `seek +0:30` skips forward half a minute. Both forms clamp the same way they always did - past the end of the track lands just short of it, before the start lands at `0` - and seeking with nothing playing still does nothing and succeeds.
+- **The upper bound is `3599`, where it was `3600`.** `seek 3600` is now rejected with "Missing or invalid argument.", which keeps the two forms to the same range: one second short of the hour, matching `59:59`. It only ever mattered on a track over an hour long, where the second was clamped away in any case. **Scripts passing a literal `3600` need changing.**
+- The position lookup, the relative arithmetic and the clamping moved out of the seconds branch and now run once for whichever form was given, and the usage screen gained a line for the new syntax - _code improvements_.
 
 ## 10.1 - August 2026
 

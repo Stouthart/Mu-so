@@ -1,4 +1,4 @@
-<!-- v10.1 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v10.2 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -13,7 +13,7 @@ Two interchangeable versions are included:
 
 Both take the same options and behave identically - pick whichever tool you already have.
 
-This is **v10.1**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new.
+This is **v10.2**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new.
 
 ## Requirements
 
@@ -87,21 +87,25 @@ Both list their favourites in the order you added them, oldest first, so adding 
 
 ### Playback
 
-| Option                    | Description                                                |
-| ------------------------- | ---------------------------------------------------------- |
-| `now`                     | Show formatted now playing info                            |
-| `notes`                   | Show notes for the current track (alias: `description`)    |
-| `play` / `pause` / `stop` | Transport control                                          |
-| `next` / `prev`           | Skip track                                                 |
-| `seek [0..3600]`          | Get the position in seconds, or seek to it                 |
-| `shuffle [0..1]`          | Get or set shuffle                                         |
-| `repeat [0..2]`           | Get or set repeat                                          |
+| Option                    | Description                                             |
+| ------------------------- | ------------------------------------------------------- |
+| `now`                     | Show formatted now playing info                         |
+| `notes`                   | Show notes for the current track (alias: `description`) |
+| `play` / `pause` / `stop` | Transport control                                       |
+| `next` / `prev`           | Skip track                                              |
+| `seek [0..3599]`          | Get the position in seconds, or seek to it              |
+| `shuffle [0..1]`          | Get or set shuffle                                      |
+| `repeat [0..2]`           | Get or set repeat                                       |
 
 `now` prints artist, title and album on the first line, and position, duration, format, sample rate, bit depth, bit rate and source on the second. Fields the speaker leaves empty are dropped from the first line rather than filled with a placeholder, so a track with no album prints as `Artist / Title`, and one with no artist as the bare title. On radio, where there is no album, the station name is printed in the brackets instead.
 
 On the second line, a format or source the speaker doesn't report shows as `UNKNOWN`. When it reports no codec - on HDMI, typically - the format is taken from the stream's MIME type instead, with the `audio/` prefix stripped, so `audio/mpeg` reads as `mpeg` and `audio/x-flac` as `x-flac`. Bit rate is read as bits per second and printed in kb/s, unrounded, so a stream can read `320.5kb/s`.
 
 `notes` prints the description the speaker holds for the track that is playing - the show notes, which on a podcast is often the full tracklist (long-form alias: `description`). It is not read from the file, nor from the server that supplied it: the speaker enriches it from Naim's own online metadata service, so it appears a moment after playback starts, and only for content that service recognises. When there is nothing to show, `notes` prints nothing and succeeds. Carriage returns the speaker embeds are stripped, so the text pastes cleanly into a terminal or a pipe. It covers the current track only - there is no per-entry equivalent for the playqueue.
+
+A bare `seek` prints the position in whole seconds. To move, pass either a number of seconds or a `min:sec` position - `seek 219` and `seek 3:39` are the same jump - and either form takes a relative `+` or `-`, so `seek +30` skips forward half a minute and `seek -1:30` rewinds a minute and a half. Both top out just under the hour, at `3599` and `59:59`; `seek 3600` is rejected. In the `min:sec` form the seconds are always two digits (`3:09`, not `3:9`), while the minutes may be written either way.
+
+A target past the end of the track is clamped to just short of it, and one before the start to `0`, so `seek -600` rewinds to the beginning rather than failing. Seeking when nothing is playing does nothing and succeeds: with no duration to seek within, the request is not sent at all.
 
 ### Playqueue
 
@@ -126,7 +130,7 @@ The display name is derived from the URL's last segment: the extension is droppe
 The MIME type is derived from the extension, because the speaker needs it: without a matching type the track still plays, but it reports a `0:00` duration and seeking does nothing.
 
 | Extension        | MIME type      |
-| ---------------- | --------------- |
+| ---------------- | -------------- |
 | `.aif` / `.aiff` | `audio/x-aiff` |
 | `.dff`           | `audio/x-dff`  |
 | `.dsf`           | `audio/x-dsf`  |
@@ -244,7 +248,9 @@ msc.sh inputs 3              # switch to Spotify
 
 msc.sh seek                  # -> 83
 msc.sh seek 90               # jump to 1:30
+msc.sh seek 1:30             # the same jump, written as min:sec
 msc.sh seek +30              # skip forward half a minute
+msc.sh seek -1:30            # and back a minute and a half
 msc.sh next                  # next track
 
 msc.sh queue                 # 1) > Nick Cave / Red Right Hand [Let Love In]

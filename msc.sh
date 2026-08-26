@@ -125,27 +125,33 @@ queue() {
   fi
 }
 
-# Get or seek position (±) - [sec]
+# Get or seek position (±) - [sec | min:sec]
 seek() {
+  local dur pos tsv val
+
   if [[ -z $1 ]]; then
     query nowplaying '((.transportPosition|tonumber?)//0)/1000|floor'
-  elif isnum "$1" 3600; then
-    local dur pos tsv val=$((BASH_REMATCH[2] * 1000))
-
-    tsv=$(query nowplaying '[(.transportPosition|tonumber?)//0,(.duration|tonumber?)//0]|@tsv')
-    read -r pos dur <<<"$tsv"
-    ((dur)) || return 0
-
-    case ${BASH_REMATCH[1]} in
-    +) ((val += pos)) || : ;;
-    -) ((val = pos - val)) || : ;;
-    esac
-
-    ((val = val < 0 ? 0 : val >= dur ? dur - 1 : val)) || :
-    http "nowplaying?cmd=seek&position=$val"
+    return
+  elif isnum "$1" 3599; then
+    val=${BASH_REMATCH[2]}
+  elif [[ $1 =~ ^([+-]?)([0-5]?[0-9]):([0-5][0-9])$ ]]; then
+    val=$((10#${BASH_REMATCH[2]} * 60 + 10#${BASH_REMATCH[3]}))
   else
     error 201
   fi
+
+  tsv=$(query nowplaying '[(.transportPosition|tonumber?)//0,(.duration|tonumber?)//0]|@tsv')
+  read -r pos dur <<<"$tsv"
+  ((dur)) || return 0
+  val=$((val * 1000))
+
+  case ${BASH_REMATCH[1]} in
+  +) ((val += pos)) || : ;;
+  -) ((val = pos - val)) || : ;;
+  esac
+
+  ((val = val < 0 ? 0 : val >= dur ? dur - 1 : val)) || :
+  http "nowplaying?cmd=seek&position=$val"
 }
 
 # Get, set or adjust (±) a setting - <ussi> <key> [arg] <max>
@@ -182,7 +188,7 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v10.1 - Control Naim Mu-so 2nd generation over HTTP
+$nm v10.2 - Control Naim Mu-so 2nd generation over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -195,7 +201,7 @@ Inputs:
 
 Playback:
   next | notes | now | pause | play | prev | stop
-  repeat 0..2 | seek 0..3600 | shuffle 0..1
+  repeat 0..2 | seek 0..3599 | shuffle 0..1
 
 Playqueue:
   add URL | clear | queue 1..n
@@ -213,6 +219,7 @@ Information:
 
 Omit the argument to read the current value.
 Numeric settings accept a relative value (e.g. vol +5, seek -30), except sleep.
+Seek also accepts a min:sec position or offset (e.g. 3:39, -1:30).
 Add replaces the playqueue with an escaped URL and starts it.
 Information options accept a key (e.g. levels volume).
 EOF
