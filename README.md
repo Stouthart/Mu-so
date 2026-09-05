@@ -1,4 +1,4 @@
-<!-- v10.2 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v10.3 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -13,13 +13,13 @@ Two interchangeable versions are included:
 
 Both take the same options and behave identically - pick whichever tool you already have.
 
-This is **v10.2**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new.
+This is **v10.3**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new.
 
 ## Requirements
 
 - **Bash** 3.2 or newer (the version macOS ships is fine)
 - **jq** - see [Installing jq](#installing-jq)
-- **wget** (for `msc.sh`) or **curl** (for `msc-curl.sh`)
+- **GNU Wget** 1.19.2 or newer (for `msc.sh`) or **curl** (for `msc-curl.sh`) - BusyBox `wget` is not compatible
 - A Naim Mu-so 2 reachable on your network
 
 ## Installation
@@ -46,6 +46,8 @@ export MUSO_IP=192.168.1.42        # or: mu-so.local
 
 Add that line to your `~/.zshrc` or `~/.bashrc` to make it permanent. To find the address, check your router's client list or the Naim app under **Settings → About**.
 
+An IP address is also the quickest of the three: it skips name resolution entirely, where `mu-so` and `mu-so.local` cost a lookup on every request. Reserve the address in your router first, so the speaker keeps it.
+
 ## Usage
 
 ```
@@ -54,9 +56,9 @@ msc.sh <option> [argument]
 
 Numeric options print the current value when called without an argument, and accept a **relative** value prefixed with `+` or `-` - `sleep` being the one exception. Write numbers without leading zeros - `vol 8`, not `vol 08`. Information options accept a key to print a single field.
 
-Options that only act - `wake`, `play`, `vol 40` - print nothing at all, whether to a terminal or into a pipe; the exit code tells you whether they worked.
+Options that only act - `wake`, `play`, `vol 40` - print nothing at all, whether to a terminal or into a pipe; the exit code tells you whether they worked. An option that takes no argument rejects one instead of ignoring it, so `stop now` fails rather than stopping.
 
-Ranges written as `0..n` are settings; ranges written as `1..n` are positions in a list. `add` is the one option whose argument is neither a number nor a key, but a URL.
+Ranges written as `0..n` are settings; ranges written as `1..n` are positions in a list.
 
 ### Power
 
@@ -101,7 +103,7 @@ Both list their favourites in the order you added them, oldest first, so adding 
 
 On the second line, a format or source the speaker doesn't report shows as `UNKNOWN`. When it reports no codec - on HDMI, typically - the format is taken from the stream's MIME type instead, with the `audio/` prefix stripped, so `audio/mpeg` reads as `mpeg` and `audio/x-flac` as `x-flac`. Bit rate is read as bits per second and printed in kb/s, unrounded, so a stream can read `320.5kb/s`.
 
-`notes` prints the description the speaker holds for the track that is playing - the show notes, which on a podcast is often the full tracklist (long-form alias: `description`). It is not read from the file, nor from the server that supplied it: the speaker enriches it from Naim's own online metadata service, so it appears a moment after playback starts, and only for content that service recognises. When there is nothing to show, `notes` prints nothing and succeeds. Carriage returns the speaker embeds are stripped, so the text pastes cleanly into a terminal or a pipe. It covers the current track only - there is no per-entry equivalent for the playqueue.
+`notes` prints the description the speaker holds for the track that is playing - the show notes, which on a podcast is often the full tracklist (long-form alias: `description`). It is not read from the file, nor from the server that supplied it: the speaker enriches it from Naim's own online metadata service, so it appears a moment after playback starts, and only for content that service recognises. When there is nothing to show, `notes` prints nothing and succeeds. Carriage returns and the other control characters the speaker embeds are stripped - line breaks and tabs survive - so the text pastes cleanly into a terminal or a pipe. It covers the current track only - there is no per-entry equivalent for the playqueue.
 
 A bare `seek` prints the position in whole seconds. To move, pass either a number of seconds or a `min:sec` position - `seek 219` and `seek 3:39` are the same jump - and either form takes a relative `+` or `-`, so `seek +30` skips forward half a minute and `seek -1:30` rewinds a minute and a half. Both top out just under the hour, at `3599` and `59:59`; `seek 3600` is rejected. In the `min:sec` form the seconds are always two digits (`3:09`, not `3:9`), while the minutes may be written either way.
 
@@ -111,35 +113,10 @@ A target past the end of the track is clamped to just short of it, and one befor
 
 | Option         | Description                                                   |
 | -------------- | ------------------------------------------------------------- |
-| `add URL`      | Replace the playqueue with _URL_ and start playing            |
 | `queue [1..n]` | List the playqueue, or jump to track _n_ (alias: `playqueue`) |
 | `clear`        | Empty the playqueue                                           |
 
 The queue is numbered from 1, and the current track is marked with a leading `>`. `queue 5` makes track 5 the current one, so playback continues from there. Entries are laid out like the first line of `now`, missing fields and all: an entry the speaker gives no album for is printed without the trailing brackets.
-
-#### add - Play a URL
-
-`add` plays a file the speaker can reach over HTTP - typically one served by a UPnP server such as minimServer, but any reachable URL will do. It is the call the Naim app makes to play from a server, and it does the whole thing in one request: the playqueue is emptied, the URL becomes its only entry, and playback starts. Despite the name it does not append; use it as "play this now".
-
-The URL must be a plain `http://` or `https://` address ending in a file extension of two to four characters. Anything else is rejected with "Missing or invalid argument."
-
-**Pass the URL exactly as the server expects it - the script does not escape it.** minimServer is the trap here: it escapes unsafe bytes in a filename as `*` followed by two hex digits rather than percent-encoding them, so an accented filename has to be written `P*C3*A1pa`, not `P%C3%A1pa`.
-
-The display name is derived from the URL's last segment: the extension is dropped, `*XX` escapes are decoded back to the characters they stand for, and underscores become spaces. So `.../Resident_1234_P*C3*A1pa.flac` shows up in the queue as `Resident 1234 Pápa`.
-
-The MIME type is derived from the extension, because the speaker needs it: without a matching type the track still plays, but it reports a `0:00` duration and seeking does nothing.
-
-| Extension        | MIME type      |
-| ---------------- | -------------- |
-| `.aif` / `.aiff` | `audio/x-aiff` |
-| `.dff`           | `audio/x-dff`  |
-| `.dsf`           | `audio/x-dsf`  |
-| `.flac`          | `audio/x-flac` |
-| `.m4a`           | `audio/mp4`    |
-| `.wav`           | `audio/x-wav`  |
-| anything else    | `audio/mpeg`   |
-
-The fallback makes `.mp3` work without an entry of its own; an extension that is genuinely something else falls back with it, plays, and loses duration and seek.
 
 ### Audio
 
@@ -257,10 +234,8 @@ msc.sh queue                 # 1) > Nick Cave / Red Right Hand [Let Love In]
                              # 2) Portishead / Roads [Dummy]
 msc.sh queue 2               # jump to Roads
 
-msc.sh add 'http://192.168.1.9:9790/minimserver/*/Podcasts/Resident_1234_P*C3*A1pa.mp3'
-                             # clears the queue and plays it
 msc.sh notes                 # the episode's tracklist, if Naim has it
-msc.sh clear                 # empty the queue again
+msc.sh clear                 # empty the queue
 
 msc.sh now
 # Nick Cave & The Bad Seeds / Red Right Hand [Let Love In]
@@ -356,6 +331,8 @@ sudo apt install jq
 | `200`                                          | Missing or invalid option                                     |
 | `201`                                          | Missing or invalid argument                                   |
 | `202`                                          | The speaker returned something that isn't valid JSON          |
+
+Redirects are refused rather than followed: the API never issues one, so a redirect means the reply did not come from the speaker. `msc.sh` reports it as `8`, `msc-curl.sh` as `47`.
 
 ## Debugging
 

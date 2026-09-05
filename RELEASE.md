@@ -1,10 +1,25 @@
-<!-- v10.2 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
+<!-- v10.3 - Copyright (c) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
 
-10.2 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 10.2 is where you started.
+10.3 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 10.3 is where you started.
+
+## 10.3 - August 2026
+
+A full read-through of both scripts, and the edge cases it turned up closed - two of them worth reading before you upgrade.
+
+- Every option, argument form and error path was checked line by line against the rest, with three models reading independently (GPT-5.6 Sol, Kimi K3 and Claude Opus 5), and the edge cases they turned up closed.
+- **An option that takes no argument now rejects one instead of ignoring it.** `clear`, `next`, `notes`, `now`, `play`, `pause`, `prev`, `standby`, `stop` and `wake` used to run whatever followed them, so `stop now` stopped and `clear queue` cleared, both exiting 0. They now print "Missing or invalid argument." and exit 201. **Aliases and Shortcuts that pass a stray word to one of these must drop it.**
+- A redirect is refused rather than followed, in both versions. The API never issues one, so a redirect means the reply did not come from the speaker - and the two versions disagreed about it: `wget` followed it, while `curl` sent writes to the redirecting address and reported success without ever reaching the target. `msc.sh` now reports it as `8`, `msc-curl.sh` as `47`.
+- `notes` strips the control characters the speaker embeds, not just the carriage returns, so text arriving from Naim's online metadata service cannot move the cursor or set colours in the terminal it is printed to. Line breaks and tabs survive.
+- `now` and `queue` treat an empty string from the speaker the way they already treated a missing key. A station reported with an empty `albumName` keeps its name in the brackets, and an empty `codec` or `sourceDetail` falls back to the MIME type and the source instead of reading `UNKNOWN`.
+- Information options take a key of 3 to 32 characters and accept `_` and `-` in it, where the check was 3 to 24 alphanumerics - the "any key" the documentation describes, rather than a narrower set it never mentioned. Three is the shortest key the speaker returns on any node (`cpu`, `uri`, `wac`).
+- The README now names the `wget` the script needs: GNU Wget 1.19.2 or newer, for `--no-netrc`, `--no-config` and `--method`. BusyBox's `wget` takes none of the three.
+- A bare `sleep` with no timer keys in the reply prints nothing and succeeds, the way a bare `queue`, `notes` and the empty lists already did, rather than exiting on the empty result.
+- The query strings passed to the request helper are quoted, so a `?` or `*` in an option's URI is never matched against filenames in the working directory.
+- `msc-curl.sh` no longer passes `--tcp-fastopen`. It saved no measurable time against the speaker, needed curl 7.49 or newer, and is left out of the Windows builds the script is documented for - where curl refuses the option outright and exits `4`, a code the script had no message for. **A Git Bash install that was failing every request with "Unexpected curl error 4." now works.**
 
 ## 10.2 - August 2026
 
@@ -17,13 +32,11 @@ A track position written the way it is read back.
 
 ## 10.1 - August 2026
 
-Two things the speaker already knew and the script never asked it for: any URL it can reach, played on the spot, and the notes behind the track that is playing.
+Something the speaker already knew and the script never asked it for: the notes behind the track that is playing.
 
-- **New `add URL`**, which empties the playqueue, puts one URL in it and starts playing - the call the Naim app makes to play a file from a UPnP server, and the reason the playqueue can now hold something the app didn't put there. It is a single request rather than a clear, an append and a play. The display name comes from the last segment of the URL, with the extension dropped, minimServer's `*XX` byte escapes decoded and underscores turned into spaces. The URL itself is sent as given - it has to arrive escaped the way the serving side expects, which for minimServer means `*XX` and not percent-encoding.
-- **The MIME type behind `add` is derived from the file extension**, because the speaker needs one: `.flac`, `.dsf`, `.m4a`, `.wav`, `.aif`/`.aiff` and `.dff` each get their own, and everything else falls back to `audio/mpeg`, which covers `.mp3`. A track sent with the wrong type still plays, but reports a `0:00` duration and won't seek.
 - **New `notes`** (long-form alias: `description`), printing the description the speaker holds for the current track - show notes, and on a podcast often the full tracklist. It doesn't come from the file or from the server that served it: the speaker enriches it from Naim's own online metadata service, so it appears a moment into playback and only for content that service recognises. Nothing to show prints nothing and succeeds, and the carriage returns the speaker embeds are stripped.
 - **A network failure while resolving `stations 2`, `playlists 1` or `queue 5` is reported for what it is.** The lookup runs in a subshell, so the `exit` that should have ended the script only ended the subshell: the real message ("Mu-so offline?") was printed, then followed by "Missing or invalid argument." and exit 201, whatever had actually gone wrong. The genuine exit code now propagates, and 201 is left to mean what it says - an index outside the list. **Scripts that read 201 from those three options as "unreachable" need changing.**
-- The internal `sleep` helper renamed to `timer`, so it no longer shadows the shell's own `sleep`; the HTTP helper in both versions gained a fourth parameter for a request body, which is what `add` posts; the `wget` and `curl` invocations were cut back to the flags that measurably earn their place, `curl` no longer pinning `--http1.1` and `wget` no longer passing `--no-iri`, neither of which changed what goes over the wire to the speaker; and the `--xdbg` trace rounds its millisecond timings instead of truncating them - _code improvements_.
+- The internal `sleep` helper renamed to `timer`, so it no longer shadows the shell's own `sleep`; the `wget` and `curl` invocations were cut back to the flags that measurably earn their place, `curl` no longer pinning `--http1.1` and `wget` no longer passing `--no-iri`, neither of which changed what goes over the wire to the speaker; and the `--xdbg` trace rounds its millisecond timings instead of truncating them - _code improvements_.
 
 ## 10.0 - August 2026
 

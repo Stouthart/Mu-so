@@ -12,29 +12,8 @@ IFS=$'\n\t'
 BASE=http://${MUSO_IP:-mu-so}:15081
 
 # Format "artist / title [album]" - <title-key>
-DESC='def desc(t):[([.artistName,t]-[null,""]|join(" / ")),(.albumName//.station|select(.>"")|"[\(.)]")]|join(" ");'
-
-# Replace the playqueue with a URL and start it - <url>
-add() {
-  local mime name
-
-  [[ $1 =~ ^https?://[^[:space:]]+\.[[:alnum:]]{2,4}$ ]] || error 201
-  name=${1##*/} name=${name%.*}
-  printf -v name '%b' "${name//\*/\\x}" # Display name only - minimServer escapes bytes as *XX
-
-  case $1 in
-  *.aif | *.aiff) mime=audio/x-aiff ;;
-  *.dff) mime=audio/x-dff ;;
-  *.dsf) mime=audio/x-dsf ;;
-  *.flac) mime=audio/x-flac ;;
-  *.m4a) mime=audio/mp4 ;;
-  *.wav) mime=audio/x-wav ;;
-  *) mime=audio/mpeg ;;
-  esac
-
-  http 'inputs/playqueue?where=end&clear=true&current=0&play=true' POST /dev/null "$(jq -cn --arg n "${name//_/ }" \
-    --arg t "$mime" --arg u "$1" '[{class:"object.track.upnp",name:$n,mimeType:$t,uri:$u}]')"
-}
+DESC='def some:select(.!=null and .!="");
+def desc(t):[([.artistName,t]-[null,""]|join(" / ")),((.albumName|some)//(.station|some)|"[\(.)]")]|join(" ");'
 
 # Print error and exit - <code>
 error() {
@@ -53,10 +32,10 @@ error() {
   exit "$1"
 }
 
-# HTTP request - <uri> [method] [output] [body]
+# HTTP request - <uri> [method] [output]
 http() {
-  curl -q -s --noproxy '*' -4 --tcp-fastopen -m2 -HUser-Agent: -f \
-    -X"${2:-GET}" -o "${3:-/dev/null}" ${4:+-d"$4"} "$BASE/$1" || error $?
+  curl -q -s --noproxy '*' -4 -m2 -HUser-Agent: -f -L --max-redirs 0 \
+    -X"${2:-GET}" -o "${3:-/dev/null}" "$BASE/$1" || error $?
 }
 
 # Valid number within max? Sets BASH_REMATCH - <arg> <max>
@@ -83,8 +62,8 @@ now() {
   local aFields i sec tsv
 
   tsv=$(query nowplaying "$DESC"'[desc(.title),(.transportPosition|tonumber?)//0,(.duration|tonumber?)//0,
-    .codec//.mimeType,(.sampleRate|tonumber?)//0,(.bitDepth|tonumber?)//0,(.bitRate|tonumber?)//0,
-    .sourceDetail//.source]|map(if.==null or.==""then"UNKNOWN"else. end)|@tsv')
+    (.codec|some)//.mimeType,(.sampleRate|tonumber?)//0,(.bitDepth|tonumber?)//0,(.bitRate|tonumber?)//0,
+    (.sourceDetail|some)//.source]|map(if.==null or.==""then"UNKNOWN"else. end)|@tsv')
   read -ra aFields <<<"$tsv"
 
   for i in 1 2; do
@@ -170,13 +149,13 @@ setting() {
 # Get, set (min) or cancel (0) sleep timer - [arg]
 timer() {
   if [[ -z $1 ]]; then
-    query alarms 'to_entries[]|select(.key|startswith("sleep"))|"\(.key)=\(.value)"'
+    query alarms 'to_entries[]|select(.key|startswith("sleep"))|"\(.key)=\(.value)"' || :
   elif isnum "$1" 120 && [[ -z ${BASH_REMATCH[1]} ]]; then
     local min=${BASH_REMATCH[2]}
     if ((min)); then
       http "alarms?sleepPeriod=$((min * 60))&cmd=sleep"
     else
-      http alarms?cmd=cancelSleep
+      http 'alarms?cmd=cancelSleep'
     fi
   else
     error 201
@@ -188,7 +167,7 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm v10.2 - Control Naim Mu-so 2nd generation over HTTP
+$nm v10.3 - Control Naim Mu-so 2nd generation over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -204,7 +183,7 @@ Playback:
   repeat 0..2 | seek 0..3599 | shuffle 0..1
 
 Playqueue:
-  add URL | clear | queue 1..n
+  clear | queue 1..n
 
 Audio:
   loudness 0..1 | mono 0..1 | mute 0..1 | vol 0..100
@@ -220,7 +199,6 @@ Information:
 Omit the argument to read the current value.
 Numeric settings accept a relative value (e.g. vol +5, seek -30), except sleep.
 Seek also accepts a min:sec position or offset (e.g. 3:39, -1:30).
-Add replaces the playqueue with an escaped URL and starts it.
 Information options accept a key (e.g. levels volume).
 EOF
 }
@@ -251,6 +229,13 @@ wired | wireless)
   ;;
 esac
 
+# Options that take no argument
+case $opt in
+clear | description | next | notes | now | play | playpause | prev | standby | stop | wake)
+  [[ -z $arg ]] || error 201
+  ;;
+esac
+
 # Main dispatcher
 case $opt in
 autostandby | standbyTimeout)
@@ -260,25 +245,25 @@ sleep)
   timer "$arg"
   ;;
 standby)
-  http power?system=lona PUT
+  http 'power?system=lona' PUT
   ;;
 wake)
-  http power?system=on PUT
+  http 'power?system=on' PUT
   ;;
 inputs)
   list inputs '.selectable=="1"and.disabled!="1"' "$arg"
   ;;
 playlists)
-  list favourites?sort=A:timeStamp '.favouriteClass//""|endswith("Playlist")' "$arg"
+  list 'favourites?sort=A:timeStamp' '.favouriteClass//""|endswith("Playlist")' "$arg"
   ;;
 stations)
-  list favourites?sort=A:timeStamp '.stationKey!=null' "$arg"
+  list 'favourites?sort=A:timeStamp' '.stationKey!=null' "$arg"
   ;;
 next | play | playpause | prev | stop)
   http "nowplaying?cmd=$opt"
   ;;
 notes | description)
-  query nowplaying '.description//empty|gsub("\r";"")' || :
+  query nowplaying '.description//empty|gsub("[\\x00-\\x08\\x0b-\\x1f\\x7f]";"")' || :
   ;;
 now)
   now
@@ -292,11 +277,8 @@ seek)
 shuffle)
   setting nowplaying shuffle "$arg" 1
   ;;
-add)
-  add "$arg"
-  ;;
 clear)
-  http inputs/playqueue?clear=true POST
+  http 'inputs/playqueue?clear=true' POST
   ;;
 queue | playqueue)
   queue "$arg"
@@ -332,7 +314,7 @@ inputs/bluetooth | system/capabilities | inputs/hdmi | levels | network | nowpla
   outputs/poweramp | inputs/qobuz | inputs/spotify | system | inputs/tidal | update | network/wired | network/wireless)
   if [[ -z $arg ]]; then
     query "$opt" 'del(.version,.changestamp,.name,.ussi,.class,.cpu,.children)|to_entries[]|"\(.key)=\(.value)"'
-  elif [[ $arg =~ ^[[:alnum:]]{3,24}$ ]]; then
+  elif [[ $arg =~ ^[[:alnum:]_-]{3,32}$ ]]; then
     value "$opt" "$arg" || :
   else
     error 201
