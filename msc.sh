@@ -5,15 +5,21 @@ IFS=$'\n\t'
 [[ ${1-} == --xdbg ]] && {
   shift
   PS4='+\e[5G\e[36m$(((${EPOCHREALTIME/./}-_ERT+500)/1000))\e[9G\e[33m$LINENO\e[13G\e[90m>\e[15G\e[m'
-  readonly _ERT=${EPOCHREALTIME/./} # Bash 5+; under 3.2 the timing column reads 0
+  : "${EPOCHREALTIME=0.0}" # Bash <5: a plain name, so the timing column reads 0
+  readonly _ERT=${EPOCHREALTIME/./}
   set -x
 }
 
 BASE=http://${MUSO_IP:-mu-so}:15081
 
+# jq preamble - some: drop null/empty, safe: strip terminal controls, flat: fold line breaks
+JQP='def some:select(.!=null and .!="");
+def safe:if type=="string"then gsub("[\\x00-\\x08\\x0b-\\x1f\\x7f]";"")else. end;
+def flat:gsub("\\x0a";" ");'
+
 # Format "artist / title [album]" - <title-key>
-DESC='def some:select(.!=null and .!="");
-def desc(t):[([.artistName,t]-[null,""]|join(" / ")),((.albumName|some)//(.station|some)|"[\(.)]")]|join(" ");'
+DESC='def desc(t):[([.artistName,t]-[null,""]|join(" / ")),
+((.albumName|some)//(.station|some)|"[\(.)]")]|map(some)|join(" ");'
 
 # Print error and exit - <code>
 error() {
@@ -46,7 +52,7 @@ isnum() {
 # List or start items - <uri> <filter> [index]
 list() {
   if [[ -z $3 ]]; then
-    query "$1" "[.children[]?|select($2)]|to_entries[]|\"\\(.key+1)) \\(.value.name)\"" || :
+    query "$1" "[.children[]?|select($2)]|to_entries[]|\"\\(.key+1)) \\(.value.name)\"|flat" || :
   elif [[ $3 =~ ^[1-9][0-9]?$ ]]; then
     local ussi
     ussi=$(query "$1" "[.children[]?|select($2)][$3-1].ussi//\"\"") || exit $?
@@ -74,15 +80,16 @@ now() {
   aFields[3]=${aFields[3]#audio/}
   aFields[4]+=e-3 aFields[6]+=e-3
   aFields[7]=${aFields[7]#inputs/}
-  printf '%s\n%s / %s - %s %gkHz %dbit %gkb/s [%s]\n' "${aFields[@]}"
+  LC_NUMERIC=C printf '%s\n%s / %s - %s %gkHz %dbit %gkb/s [%s]\n' "${aFields[@]}"
 }
 
 # Fetch JSON, exit on error - <uri> <filter>
 query() {
   local json rc
   json=$(http "$1" GET -) || exit $?
+  [[ -n $json ]] || error 202
 
-  jq -re "$2" <<<"$json" || {
+  jq -re "$JQP($2)|safe" <<<"$json" || {
     rc=$?
     case $rc in 2 | 3 | 5) error 202 ;; esac
     return $rc
@@ -93,7 +100,7 @@ query() {
 queue() {
   if [[ -z $1 ]]; then
     query inputs/playqueue "$DESC"'[.children[]?+{c:.current}]|to_entries[]|["\(.key+1))",
-      (select(.value.ussi==.value.c)|">"),(.value|desc(.name))]|join(" ")' || :
+      (select(.value.ussi==.value.c)|">"),(.value|desc(.name))]|join(" ")|flat' || :
   elif [[ $1 =~ ^[1-9][0-9]?$ ]]; then
     local ussi
     ussi=$(query inputs/playqueue "[.children[]?][$1-1].ussi//\"\"") || exit $?
@@ -106,15 +113,15 @@ queue() {
 
 # Get or seek position (±) - [sec | min:sec]
 seek() {
-  local dur pos tsv val
+  local dur pos sign='' tsv val
 
   if [[ -z $1 ]]; then
     query nowplaying '((.transportPosition|tonumber?)//0)/1000|floor'
     return
   elif isnum "$1" 3599; then
-    val=${BASH_REMATCH[2]}
+    val=${BASH_REMATCH[2]} sign=${BASH_REMATCH[1]}
   elif [[ $1 =~ ^([+-]?)([0-5]?[0-9]):([0-5][0-9])$ ]]; then
-    val=$((10#${BASH_REMATCH[2]} * 60 + 10#${BASH_REMATCH[3]}))
+    val=$((10#${BASH_REMATCH[2]} * 60 + 10#${BASH_REMATCH[3]})) sign=${BASH_REMATCH[1]}
   else
     error 201
   fi
@@ -124,7 +131,7 @@ seek() {
   ((dur)) || return 0
   val=$((val * 1000))
 
-  case ${BASH_REMATCH[1]} in
+  case $sign in
   +) ((val += pos)) || : ;;
   -) ((val = pos - val)) || : ;;
   esac
@@ -149,7 +156,7 @@ setting() {
 # Get, set (min) or cancel (0) sleep timer - [arg]
 timer() {
   if [[ -z $1 ]]; then
-    query alarms 'to_entries[]|select(.key|startswith("sleep"))|"\(.key)=\(.value)"' || :
+    query alarms 'to_entries[]|select(.key|startswith("sleep"))|"\(.key)=\(.value)"|flat' || :
   elif isnum "$1" 120 && [[ -z ${BASH_REMATCH[1]} ]]; then
     local min=${BASH_REMATCH[2]}
     if ((min)); then
@@ -167,7 +174,7 @@ usage() {
   local nm=${0##*/}
 
   cat <<EOF
-$nm 10.3 - Control Naim Mu-so 2nd generation over HTTP
+$nm 10.4 - Control Naim Mu-so 2nd generation over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -204,7 +211,7 @@ EOF
 }
 
 # Get single JSON value - <ussi> <key>
-value() { query "$1" ".\"$2\"//empty"; }
+value() { query "$1" ".\"$2\"|some"; }
 
 (($# < 3)) || error 201
 opt=${1-}
@@ -231,7 +238,7 @@ esac
 
 # Options that take no argument
 case $opt in
-clear | description | next | notes | now | play | playpause | prev | standby | stop | wake)
+-h | --help | clear | description | help | next | notes | now | play | playpause | prev | standby | stop | wake)
   [[ -z $arg ]] || error 201
   ;;
 esac
@@ -263,7 +270,7 @@ next | play | playpause | prev | stop)
   http "nowplaying?cmd=$opt"
   ;;
 notes | description)
-  query nowplaying '.description//empty|gsub("[\\x00-\\x08\\x0b-\\x1f\\x7f]";"")' || :
+  query nowplaying '.description|some' || :
   ;;
 now)
   now
@@ -313,7 +320,7 @@ roomcomp | position)
 inputs/bluetooth | system/capabilities | inputs/hdmi | levels | network | nowplaying | outputs | power | \
   outputs/poweramp | inputs/qobuz | inputs/spotify | system | inputs/tidal | update | network/wired | network/wireless)
   if [[ -z $arg ]]; then
-    query "$opt" 'del(.version,.changestamp,.name,.ussi,.class,.cpu,.children)|to_entries[]|"\(.key)=\(.value)"'
+    query "$opt" 'del(.version,.changestamp,.name,.ussi,.class,.cpu,.children)|to_entries[]|"\(.key)=\(.value)"|flat'
   elif [[ $arg =~ ^[[:alnum:]_-]{3,32}$ ]]; then
     value "$opt" "$arg" || :
   else

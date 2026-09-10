@@ -1,4 +1,4 @@
-<!-- 10.3 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
+<!-- 10.4 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -13,7 +13,7 @@ Two interchangeable versions are included:
 
 Both take the same options and behave identically - pick whichever tool you already have.
 
-This is **version 10.3**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new.
+This is **version 10.4**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new.
 
 ## Requirements
 
@@ -103,7 +103,7 @@ Both list their favourites in the order you added them, oldest first, so adding 
 
 On the second line, a format or source the speaker doesn't report shows as `UNKNOWN`. When it reports no codec - on HDMI, typically - the format is taken from the stream's MIME type instead, with the `audio/` prefix stripped, so `audio/mpeg` reads as `mpeg` and `audio/x-flac` as `x-flac`. Bit rate is read as bits per second and printed in kb/s, unrounded, so a stream can read `320.5kb/s`.
 
-`notes` prints the description the speaker holds for the track that is playing - the show notes, which on a podcast is often the full tracklist (long-form alias: `description`). It is not read from the file, nor from the server that supplied it: the speaker enriches it from Naim's own online metadata service, so it appears a moment after playback starts, and only for content that service recognises. When there is nothing to show, `notes` prints nothing and succeeds. Carriage returns and the other control characters the speaker embeds are stripped - line breaks and tabs survive - so the text pastes cleanly into a terminal or a pipe. It covers the current track only - there is no per-entry equivalent for the playqueue.
+`notes` prints the description the speaker holds for the track that is playing - the show notes, which on a podcast is often the full tracklist (long-form alias: `description`). It is not read from the file, nor from the server that supplied it: the speaker enriches it from Naim's own online metadata service, so it appears a moment after playback starts, and only for content that service recognises. When there is nothing to show, `notes` prints nothing and succeeds. Carriage returns and the other control characters the speaker embeds are stripped - line breaks and tabs survive here, so a tracklist keeps its shape - and the text pastes cleanly into a terminal or a pipe. That stripping applies to every option, not just this one: any text arriving from the speaker is cleaned the same way. Where the output is one entry per line - the numbered lists, `queue`, `sleep` and the `key=value` information output - a line break inside a name or value is folded to a space as well, so an entry can never spill onto a second line. `notes` covers the current track only - there is no per-entry equivalent for the playqueue.
 
 A bare `seek` prints the position in whole seconds. To move, pass either a number of seconds or a `min:sec` position - `seek 219` and `seek 3:39` are the same jump - and either form takes a relative `+` or `-`, so `seek +30` skips forward half a minute and `seek -1:30` rewinds a minute and a half. Both top out just under the hour, at `3599` and `59:59`; `seek 3600` is rejected. In the `min:sec` form the seconds are always two digits (`3:09`, not `3:9`), while the minutes may be written either way.
 
@@ -134,29 +134,31 @@ The queue is numbered from 1, and the current track is marked with a leading `>`
 | Option              | Description                                      |
 | ------------------- | ------------------------------------------------ |
 | `autoswitch [0..2]` | Get or set HDMI auto switching                   |
-| `lighting [0..2]`   | Get or set the front panel light theme           |
+| `lighting [0..2]`   | Get or set the lighting level                    |
 | `lipsync [0..50]`   | Get or set the HDMI audio delay                  |
 | `maxvol [0..100]`   | Get or set the power amp maximum volume          |
-| `pairing [0..1]`    | Get or set Bluetooth pairing mode                |
+| `pairing [0..1]`    | Get or set Bluetooth open pairing                |
 | `roomcomp [0..2]`   | Get or set room compensation (alias: `position`) |
 
 `maxvol` is the app's **Max Volume**, the upper limit of the volume control - useful to keep a stray `vol 100` from shaking the room.
 
-`lipsync` is the app's **Auto Lip Sync**: it delays the audio to line it up with the picture on a TV connected over HDMI. It writes the `delay` key on the HDMI input, in milliseconds, in the same 0..50 steps the app's slider uses, so it applies to that input only (long-form alias: `delay`).
+`lipsync` is the app's **Lip Sync**, under the HDMI input's settings - not **Auto Lip Sync**, which is a separate automatic correction: it delays the audio to line it up with the picture on a TV connected over HDMI. It writes the `delay` key on the HDMI input, in milliseconds, in the same 0..50 steps the app's slider uses, so it applies to that input only (long-form alias: `delay`).
 
-`pairing 1` is the app's **Bluetooth Pairing**: it opens the speaker for pairing so a phone or laptop can discover it, and `pairing 0` closes it again. It writes the `open` key on the Bluetooth input (long-form alias: `open`); `bluetooth` reports it back next to the device name and the connection state.
+`pairing 1` is the app's **Open pairing**: with it enabled any Bluetooth device can connect without first having to put the speaker into pairing mode, and `pairing 0` closes it again. It writes the `open` key on the Bluetooth input (long-form alias: `open`); `bluetooth` reports it back next to the device name and the connection state.
+
+`lighting` is the app's **Lighting**, which adjusts the level of the Mu-so illumination (long-form alias: `lightTheme`, the key the API uses).
 
 `autoswitch` controls whether the speaker selects the HDMI input by itself when the TV starts sending audio (long-form alias: `autoSwitching`). Use `hdmi` to see the input's state, including the value `autoswitch` and `lipsync` write.
 
 #### roomcomp - Room Compensation
 
-Adjusts the sound to compensate for where the speaker stands in the room, which can noticeably improve the bass.
+The app's **Room position**: it configures room compensation, adjusting the sound to compensate for the room characteristics, which can noticeably improve the bass.
 
-| Value | Label       | Meaning                                                                   |
-| ----- | ----------- | ------------------------------------------------------------------------- |
-| `0`   | Normal      | Free-standing                                                             |
-| `1`   | Near wall   | Optimal when the Mu-so is positioned close to a wall (less than 25 cm)    |
-| `2`   | Near corner | Optimal when the Mu-so is positioned near a room corner (less than 45 cm) |
+| Value | Label       | Meaning                                                                         |
+| ----- | ----------- | ------------------------------------------------------------------------------- |
+| `0`   | Normal      | Mu-so is positioned 25cm or more away from a wall                               |
+| `1`   | Near wall   | Optimal when the Mu-so is positioned close to a wall (less than 25cm)           |
+| `2`   | Near corner | Optimal when the Mu-so is positioned near the corner of a room (less than 45cm) |
 
 #### autoswitch - HDMI Auto Switching
 
@@ -195,7 +197,7 @@ Print all fields, or a single field when given a key.
 
 Housekeeping keys the API repeats on every node (`version`, `changestamp`, `name`, `ussi`, `class`, `cpu`, `children`) are left out; everything else the node returns is printed as `key=value`.
 
-`help` - or no arguments at all - prints the built-in usage screen.
+`help` - or no arguments at all - prints the built-in usage screen. `-h` and `--help` do the same. Like the other options that take no argument, all three reject a stray one, so `help stop` fails rather than printing the usage.
 
 ## Examples
 
@@ -330,13 +332,13 @@ sudo apt install jq
 | `8` (wget) / `22` (curl)                       | Server error - the speaker is probably in standby             |
 | `200`                                          | Missing or invalid option                                     |
 | `201`                                          | Missing or invalid argument                                   |
-| `202`                                          | The speaker returned something that isn't valid JSON          |
+| `202`                                          | The speaker returned nothing, invalid JSON, or an empty value |
 
 Redirects are refused rather than followed: the API never issues one, so a redirect means the reply did not come from the speaker. `msc.sh` reports it as `8`, `msc-curl.sh` as `47`.
 
 ## Debugging
 
-Pass `--xdbg` as the very first argument to trace execution with per-line timings. Requires Bash 5.0 or newer:
+Pass `--xdbg` as the very first argument to trace execution with per-line timings. The trace runs on any Bash the scripts support; the millisecond column needs Bash 5.0 or newer and reads `0` below it:
 
 ```bash
 ./msc.sh --xdbg vol +5

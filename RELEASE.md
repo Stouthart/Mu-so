@@ -1,10 +1,24 @@
-<!-- 10.3 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
+<!-- 10.4 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
 
-10.3 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 10.3 is where you started.
+10.4 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 10.4 is where you started.
+
+## 10.4 - September 2026
+
+A second read-through of both scripts, narrower than 10.3 and aimed at what the speaker sends back rather than what is typed in.
+
+- **Control characters are stripped from everything the speaker returns, not just `notes`.** 10.3 cleaned the description alone, but names reach the terminal through `inputs`, `playlists`, `stations`, `queue` and `now` as well, and a track or station named over Naim's online metadata service could still move the cursor or set colours there. The stripping now happens once, where the reply is parsed, so every option is covered. Tabs survive, and so do the line breaks in `notes`.
+- **A line break inside a name or value no longer splits a listed entry across two lines.** Where the output is one entry per line - the numbered lists, `queue`, `sleep` and the `key=value` information output - a line break is folded to a space, so the numbering stays readable and a line can still be split on its first `=` or `)`. `notes` is untouched: a podcast tracklist keeps its line breaks.
+- **`now` prints `44.1kHz` under every locale.** Where `LC_NUMERIC` asked for a comma - `de_DE.UTF-8` and `fr_FR.UTF-8` among others - the sample rate and bit rate read `44,1kHz` and `1,411kb/s`. The figures are now formatted in the C locale regardless of the environment.
+- A track known only by its album or station no longer gains a leading space. `now` and `queue` printed `" [Kind of Blue]"` where the artist and title were both missing or empty.
+- An empty reply from the speaker is reported as "Invalid response from Mu-so." and exits 202, where it used to print nothing and succeed. A reply that parses but holds no matching keys is unchanged: a bare `sleep` with no timer keys and an empty list still print nothing and exit 0.
+- Reading a setting that comes back as an empty string reports 202, which is what the missing-value case already did, rather than printing a blank line and succeeding.
+- `help`, `-h` and `--help` reject a stray argument, the way the other options that take none have since 10.3. `help stop` now prints "Missing or invalid argument." and exits 201 instead of printing the usage.
+- `--xdbg` no longer exits before it traces anything on the later Bash 4 releases. `EPOCHREALTIME`, which the trace reads for its timings, arrived in Bash 5.0, and by the end of the Bash 4 line `set -u` had come to treat a substitution on an unset name as a fatal error rather than an empty string - so the flag ended the script on "EPOCHREALTIME: unbound variable" instead of tracing. It now falls back to a fixed `0.0` where the shell has no clock of its own, which leaves the trace running and the millisecond column reading `0` throughout - what Bash 3.2 has shown all along.
+- The sign of a relative `seek` is now captured with the value instead of being read back from the match state after the position has been fetched - a regex added anywhere in between would have silently changed which way `seek +30` moved - _code improvements_.
 
 ## 10.3 - August 2026
 
@@ -63,9 +77,9 @@ The scripts do what they set out to do, and this is the round of polish that say
 
 ## 9.4 - August 2026
 
-Bluetooth pairing without reaching for the app.
+Bluetooth open pairing without reaching for the app.
 
-- New `pairing 0..1`, putting the speaker into Bluetooth pairing mode so a phone or laptop can discover it, and taking it back out. It writes the `open` key on the Bluetooth input, the one the Naim app's pairing switch uses, and `bluetooth` reports it back alongside the device name and connection state.
+- New `pairing 0..1`, letting any Bluetooth device connect without first putting the speaker into pairing mode, and closing it again. It writes the `open` key on the Bluetooth input, the one the Naim app's **Open pairing** switch uses, and `bluetooth` reports it back alongside the device name and connection state.
 - The `start` helper - renamed from `play` only in 9.0 - is gone again: its single caller now plays the resolved item directly. The usage screen's **Other** section wraps onto a second line to fit the new option - _code improvements_.
 
 ## 9.3 - August 2026
@@ -218,7 +232,7 @@ Complete rewrite of the first version.
 
 - **2.1** - `shuffle`, `repeat` and `mute`.
 - **2.3** - Human-readable error messages instead of raw `curl` exit codes.
-- **2.5** - `loudness`, `mono` and the `lighting` theme setting.
+- **2.5** - `loudness`, `mono` and the `lighting` level setting.
 - The host override environment variable became `MUSO_HOST` (previously `NAIM_HOST`).
 
 ## 1.0 - October 2025
