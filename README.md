@@ -1,8 +1,8 @@
-<!-- 10.4 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
+<!-- 10.5 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
-A small Bash script that controls a **Naim Mu-so 2** from the command line, over your local network. It talks to the speaker's built-in HTTP API on port `15081` - no app, no cloud, no account. Handy for shell aliases, Apple Shortcuts, Stream Deck buttons, or Home Assistant `shell_command`.
+A small Bash script that controls a **Naim Mu-so 2** from the command line, over your local network. It talks to the speaker's built-in HTTP API on port `15081` - and, for the format of a Spotify lossless stream, its player API on port `80` - no app, no cloud, no account. Handy for shell aliases, Apple Shortcuts, Stream Deck buttons, or Home Assistant `shell_command`.
 
 Two interchangeable versions are included:
 
@@ -13,7 +13,7 @@ Two interchangeable versions are included:
 
 Both take the same options and behave identically - pick whichever tool you already have.
 
-This is **version 10.4**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new.
+This is **version 10.5**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new.
 
 ## Requirements
 
@@ -89,21 +89,26 @@ Both list their favourites in the order you added them, oldest first, so adding 
 
 ### Playback
 
-| Option                    | Description                                             |
-| ------------------------- | ------------------------------------------------------- |
-| `now`                     | Show formatted now playing info                         |
-| `notes`                   | Show notes for the current track (alias: `description`) |
-| `play` / `pause` / `stop` | Transport control                                       |
-| `next` / `prev`           | Skip track                                              |
-| `seek [0..3599]`          | Get the position in seconds, or seek to it              |
-| `shuffle [0..1]`          | Get or set shuffle                                      |
-| `repeat [0..2]`           | Get or set repeat                                       |
+| Option                    | Description                                |
+| ------------------------- | ------------------------------------------ |
+| `now`                     | Show formatted now playing info            |
+| `artwork`                 | Show the artwork URL for the current track |
+| `description`             | Show the description of the current track  |
+| `play` / `pause` / `stop` | Transport control                          |
+| `next` / `prev`           | Skip track                                 |
+| `seek [0..3599]`          | Get the position in seconds, or seek to it |
+| `shuffle [0..1]`          | Get or set shuffle                         |
+| `repeat [0..2]`           | Get or set repeat                          |
 
 `now` prints artist, title and album on the first line, and position, duration, format, sample rate, bit depth, bit rate and source on the second. Fields the speaker leaves empty are dropped from the first line rather than filled with a placeholder, so a track with no album prints as `Artist / Title`, and one with no artist as the bare title. On radio, where there is no album, the station name is printed in the brackets instead.
 
 On the second line, a format or source the speaker doesn't report shows as `UNKNOWN`. When it reports no codec - on HDMI, typically - the format is taken from the stream's MIME type instead, with the `audio/` prefix stripped, so `audio/mpeg` reads as `mpeg` and `audio/x-flac` as `x-flac`. Bit rate is read as bits per second and printed in kb/s, unrounded, so a stream can read `320.5kb/s`.
 
-`notes` prints the description the speaker holds for the track that is playing - the show notes, which on a podcast is often the full tracklist (long-form alias: `description`). It is not read from the file, nor from the server that supplied it: the speaker enriches it from Naim's own online metadata service, so it appears a moment after playback starts, and only for content that service recognises. When there is nothing to show, `notes` prints nothing and succeeds. Carriage returns and the other control characters the speaker embeds are stripped - line breaks and tabs survive here, so a tracklist keeps its shape - and the text pastes cleanly into a terminal or a pipe. That stripping applies to every option, not just this one: any text arriving from the speaker is cleaned the same way. Where the output is one entry per line - the numbered lists, `queue`, `sleep` and the `key=value` information output - a line break inside a name or value is folded to a space as well, so an entry can never spill onto a second line. `notes` covers the current track only - there is no per-entry equivalent for the playqueue.
+Spotify lossless streams are the exception the speaker's API gets wrong: it reports them as `UNKNOWN CODEC`, or as `FLAC` with a bit rate of 0. When `now` sees either, it asks the speaker's player API on port `80` - a second, read-only request - for the codec, the bit depth when it is 24-bit, and the bit rate, so a 24-bit track reads `FLAC 0kHz 24bit 1675.81kb/s`. Neither API reports Spotify's sample rate, so that stays `0kHz`. Any other source makes the extra request only in those same two cases, and if port `80` doesn't answer, the line is printed as the main API gave it.
+
+`description` prints the description embedded in the comments of the track that is playing - the show notes, which on a podcast is often the full tracklist. When there is nothing to show, `description` prints nothing and succeeds. Carriage returns and the other control characters in that text (the C0 controls, DEL and the C1 range U+0080 to U+009F) are stripped - line breaks and tabs survive here, so a tracklist keeps its shape - and the text pastes cleanly into a terminal or a pipe. That stripping applies to every option, not just this one: any text arriving from the speaker is cleaned the same way. Where the output is one entry per line - the numbered lists, `queue`, `sleep` and the `key=value` information output - a line break inside a name or value is folded to a space as well, so an entry can never spill onto a second line. `description` covers the current track only - there is no per-entry equivalent for the playqueue.
+
+`artwork` prints the URL of the current track's artwork - an image the speaker serves itself, or the streaming service's own link - so it can be opened straight away, with `open -u "$(msc.sh artwork)"` on macOS. With no artwork to show it prints nothing and succeeds.
 
 A bare `seek` prints the position in whole seconds. To move, pass either a number of seconds or a `min:sec` position - `seek 219` and `seek 3:39` are the same jump - and either form takes a relative `+` or `-`, so `seek +30` skips forward half a minute and `seek -1:30` rewinds a minute and a half. Both top out just under the hour, at `3599` and `59:59`; `seek 3600` is rejected. In the `min:sec` form the seconds are always two digits (`3:09`, not `3:9`), while the minutes may be written either way.
 
@@ -176,24 +181,24 @@ This only takes effect when the TV powers on or off, so changing it produces no 
 
 Print all fields, or a single field when given a key.
 
-| Option         | Description                                      |
-| -------------- | ------------------------------------------------ |
-| `bluetooth`    | Bluetooth name, pairing and connection state     |
-| `capabilities` | System capabilities                              |
-| `hdmi`         | HDMI input state                                 |
-| `levels`       | Volume, mute and related levels                  |
-| `network`      | Network status                                   |
-| `nowplaying`   | Raw now playing data                             |
-| `outputs`      | Output settings                                  |
-| `power`        | Power state and standby timeout                  |
-| `poweramp`     | Power amp settings                               |
-| `qobuz`        | Qobuz input state                                |
-| `spotify`      | Spotify input state                              |
-| `system`       | System and firmware details                      |
-| `tidal`        | Tidal input state                                |
-| `update`       | Firmware update status                           |
-| `wired`        | Ethernet interface details                       |
-| `wireless`     | Wi-Fi interface details, signal and link quality |
+| Option         | Description                                                          |
+| -------------- | -------------------------------------------------------------------- |
+| `bluetooth`    | Bluetooth name, pairing and connection state                         |
+| `capabilities` | System capabilities                                                  |
+| `hdmi`         | HDMI input state                                                     |
+| `levels`       | Volume, mute and related levels                                      |
+| `network`      | Network status                                                       |
+| `nowplaying`   | Raw now playing data                                                 |
+| `outputs`      | Output settings                                                      |
+| `power`        | Power state and standby timeout                                      |
+| `poweramp`     | Power amp settings                                                   |
+| `qobuz`        | Qobuz input state                                                    |
+| `spotify`      | Spotify input state                                                  |
+| `system`       | System and firmware details                                          |
+| `tidal`        | Tidal input state                                                    |
+| `update`       | Firmware update status                                               |
+| `wifi`         | Wi-Fi interface details, signal and link quality (alias: `wireless`) |
+| `wired`        | Ethernet interface details                                           |
 
 Housekeeping keys the API repeats on every node (`version`, `changestamp`, `name`, `ussi`, `class`, `cpu`, `children`) are left out; everything else the node returns is printed as `key=value`.
 
@@ -236,12 +241,17 @@ msc.sh queue                 # 1) > Nick Cave / Red Right Hand [Let Love In]
                              # 2) Portishead / Roads [Dummy]
 msc.sh queue 2               # jump to Roads
 
-msc.sh notes                 # the episode's tracklist, if Naim has it
+msc.sh description           # the episode's tracklist, if Naim has it
+msc.sh artwork               # https://i.scdn.co/image/ab67616d...
 msc.sh clear                 # empty the queue
 
 msc.sh now
 # Nick Cave & The Bad Seeds / Red Right Hand [Let Love In]
 # 1:23 / 6:11 - FLAC 44.1kHz 16bit 1004kb/s [Qobuz]
+
+msc.sh now                   # Spotify lossless: format from the player API
+# Ezra Collective / Blow Your Trumpet [Here Because of Hope]
+# 0:25 / 4:20 - FLAC 0kHz 24bit 1675.81kb/s [spotify]
 
 msc.sh now                   # on radio, the station fills the brackets
 # Kate Bush / Running Up That Hill [NPO Radio 2]
@@ -249,7 +259,7 @@ msc.sh now                   # on radio, the station fills the brackets
 msc.sh levels volume         # single field -> 40
 msc.sh system                # every field as key=value
 msc.sh system hostCpuTemp    # -> 4319 (43.2 degrees)
-msc.sh wireless              # Wi-Fi signal, link quality, SSID
+msc.sh wifi                  # Wi-Fi signal, link quality, SSID
 msc.sh autostandby 30        # standby after 30 minutes idle
 msc.sh lipsync 12            # delay the HDMI audio
 msc.sh autoswitch            # -> 1
@@ -325,16 +335,18 @@ sudo apt install jq
 
 ## Exit codes
 
-| Code                                           | Meaning                                                       |
-| ---------------------------------------------- | ------------------------------------------------------------- |
-| `0`                                            | Success                                                       |
-| `4` (wget) / `6`, `7`, `28`, `52`, `56` (curl) | Network failure - speaker offline, timed out or wrong address |
-| `8` (wget) / `22` (curl)                       | Server error - the speaker is probably in standby             |
-| `200`                                          | Missing or invalid option                                     |
-| `201`                                          | Missing or invalid argument                                   |
-| `202`                                          | The speaker returned nothing, invalid JSON, or an empty value |
+| Code                                                 | Meaning                                                                                 |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `0`                                                  | Success                                                                                 |
+| `4` (wget) / `6`, `7`, `18`, `28`, `52`, `56` (curl) | Network failure - speaker offline, timed out, wrong address or reply cut off            |
+| `8` (wget) / `22`, `47` (curl)                       | Server error - the speaker is probably in standby                                       |
+| `200`                                                | Missing or invalid option                                                               |
+| `201`                                                | Missing or invalid argument                                                             |
+| `202`                                                | The speaker returned nothing, invalid JSON, more than one JSON value, or an empty value |
 
-Redirects are refused rather than followed: the API never issues one, so a redirect means the reply did not come from the speaker. `msc.sh` reports it as `8`, `msc-curl.sh` as `47`.
+A server error names the API endpoint the request went to - `Server error on levels, Mu-so in standby?` - so it is clear which request failed. The other messages are unchanged: a network failure hits every endpoint alike, so there is nothing to name.
+
+Redirects are refused rather than followed: the API never issues one, so a redirect means the reply did not come from the speaker. Both report it as a server error: `msc.sh` exits `8`, `msc-curl.sh` `47`.
 
 ## Debugging
 
