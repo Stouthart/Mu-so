@@ -2,19 +2,28 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# jq preamble - int: whole number or 0, num: number or 0, some: drop null/empty;
+# API base, and wget with the options every request shares; --no-iri spares it a charset conversion in the C locale
+BASE=http://${MUSO_IP:-mu-so}:15081
+WGET=(wget -q --no-config --no-netrc --no-hsts --no-cookies --no-proxy --no-iri --max-redirect=0 -4 -T2 -U '' -t1)
+
+# jq preamble - reply: filter the one JSON value read; none, invalid JSON, more than one or a failing filter exits 5
+# quietly - <filter>; sealed: reply on a raw read that ends in NUL and the reader's exit status, only when that is 0;
+# int: whole number or 0, num: number or 0, some: drop null/empty;
 # ctl: strip C0/C1 controls from a string, rec: ctl throughout, safe: ctl for any type (jq -r escapes C0 and DEL
 # in JSON, so it walks only on C1); line: fold line breaks and strip controls, kv: key=value line;
-# desc: format "artist / title [album]" - <title-key>
+# val: a value to print, booleans as text; desc: format "artist / title [album]" - <title-key>
 # Unreferenced defs cost nothing; each caller appends only the sanitizer its output needs
-JQP='def int:(tonumber?|floor)//0;
-def num:(tonumber?)//0;
+JQP='def reply(f):try([inputs]|if length==1 then .[0] else error end|f)catch(""|halt_error(5));
+def sealed(f):try(split("\u0000")|if length==2 and .[1]=="0" then .[0]|fromjson else error end|f)catch(""|halt_error(5));
+def num:(tonumber?|select(.>=0 and .<9007199254740992))//0;
+def int:num|floor;
 def some:select(.!=null and .!="");
 def ctl:gsub("[\\x00-\\x08\\x0b-\\x1f\u007f-\u009f]";"");
 def rec:if type=="string"then ctl elif type=="array"then map(rec)elif type=="object"then with_entries(.key|=rec|.value|=rec)else. end;
 def safe:if type=="string"then ctl elif(tojson|test("[\u0080-\u009f]"))then rec else. end;
 def line:gsub("(?<l>\\x0a)|[\\x00-\\x08\\x0b-\\x1f\u007f-\u009f]";if.l then" "else""end);
 def kv:"\(.key)=\(.value)"|line;
+def val:some|if type=="boolean"then tostring else safe end;
 def desc(t):[([.artistName,t]-[null,""]|join(" / ")),((.albumName|some)//(.station|some)|"[\(.)]")]|map(some)|join(" ");'
 
 [[ ${1-} == --xdbg ]] && {
@@ -24,8 +33,6 @@ def desc(t):[([.artistName,t]-[null,""]|join(" / ")),((.albumName|some)//(.stati
   readonly _ERT=${EPOCHREALTIME/./}
   set -x
 }
-
-BASE=http://${MUSO_IP:-mu-so}:15081
 
 # Print error and exit - <code> [uri]
 error() {
@@ -44,10 +51,9 @@ error() {
   exit "$1"
 }
 
-# Send HTTP request, exec'd with output (pipe only) - <uri> [method] [output]
+# Send HTTP request, exec'd with output (pipe only); wget starts faster in the C locale - <uri> [method] [output]
 http() {
-  ${3+exec} wget -q --no-config --no-netrc --no-hsts --no-cookies --no-proxy --max-redirect=0 -4 -T2 -U '' -t1 \
-    --method="${2:-GET}" -O "${3:-/dev/null}" "$BASE/$1" || error $? "$1"
+  LC_ALL=C ${3+exec} "${WGET[@]}" --method="${2:-GET}" -O "${3:-/dev/null}" "$BASE/$1" || error $? "${1%%[?]*}"
 }
 
 # Valid number within max? Sets BASH_REMATCH - <arg> <max>
@@ -60,52 +66,35 @@ list() {
   if [[ -z $3 ]]; then
     query "$1" "[.children[]?|select($2)]|to_entries[]|\"\\(.key+1)) \\(.value.name)\"|line" || :
   else
-    local u
-    u=$(ussi "$1" "$2" "$3") || exit $?
-    http "$u?cmd=play"
+    ussi "$1" "$2" "$3" '\(.)?cmd=play' GET
   fi
 }
 
 # Show now playing info
 now() {
-  local aFields bits codec dur pos rate tsv
+  local rc
 
-  tsv=$(query nowplaying '[desc(.title),(.transportPosition|int),(.duration|int),
-    (.codec|some)//.mimeType,(.sampleRate|num),(.bitDepth|int),(.bitRate|num),
-    (.sourceDetail|some)//.source]|map(if.==null or.==""then"UNKNOWN"else. end)|@sh|ctl')
-  eval "aFields=($tsv)"
-
-  # Spotify: UNKNOWN CODEC, or FLAC without bit rate - take codec, depth and bit rate from the player API, best effort
-  if [[ ${aFields[3]} == UNKNOWN* || ${aFields[3]} == FLAC && ${aFields[6]} == 0 ]]; then
-    tsv=$(BASE=${BASE%:*}/api query "getData?path=player:player/data&roles=value" '.[0].trackRoles.mediaData|
-      .resources[0]?|[(.codec|strings|capture("\\((?<c>[^()]+?)(?: (?<b>[0-9]+) ?bit)?\\)$"))//{},
-      (.bitRate|int)]|@sh "codec=\(.[0].c//"") bits=\(.[0].b//0) rate=\(.[1])"|ctl' 2>/dev/null) || tsv=
-    eval "$tsv"
-
-    [[ ${codec:-UNKNOWN} == UNKNOWN ]] || aFields[3]=$codec
-    ((${bits:-0})) && aFields[5]=$bits || :
-    ((${rate:-0})) && aFields[6]=$rate || :
-  fi
-
-  pos=$((aFields[1] / 1000 % 60 + 100)) dur=$((aFields[2] / 1000 % 60 + 100))
-  aFields[1]=$((aFields[1] / 60000)):${pos#1} aFields[2]=$((aFields[2] / 60000)):${dur#1}
-
-  aFields[3]=${aFields[3]#audio/}
-  aFields[4]+=e-3 aFields[6]+=e-3
-  aFields[7]=${aFields[7]#inputs/}
-  LC_NUMERIC=C printf '%s\n%s / %s - %s %gkHz %dbit %gkb/s [%s]\n' "${aFields[@]}"
+  # Piped into show rather than captured, so wget starts a fork sooner
+  http nowplaying GET - | jq -nre "${JQP}reply("'[desc(.title),(.transportPosition|int),(.duration|int),
+    (.codec|some)//.mimeType,(.sampleRate|num/1000),(.bitDepth|int),(.bitRate|num/1000),
+    (.sourceDetail|some)//.source]|map(if.==null or.==""then"UNKNOWN"else. end)|@sh|line)' | show || {
+    rc=("${PIPESTATUS[@]}")
+    ((rc[0])) && error "${rc[0]}" nowplaying
+    ((rc[1])) && error 202
+    return "${rc[2]}"
+  }
 }
 
-# Fetch JSON, exit on error - <uri> <filter, ending in its sanitizer>
+# Fetch JSON, exit on error; returns 4 when the filter prints nothing - <uri> <filter, ending in its sanitizer>
 query() {
   local rc
 
-  # Streamed, not captured; no reply, invalid JSON or more than one value exits jq 5
-  http "$1" GET - | jq -nre "$JQP(try([inputs]|if length==1 then .[0] else error end)catch(\"\"|halt_error(5))|$2)" || {
+  # Streamed, not captured
+  http "$1" GET - | jq -nre "${JQP}reply($2)" || {
     rc=("${PIPESTATUS[@]}")
     ((rc[0])) && error "${rc[0]}" "$1"
-    case ${rc[1]} in 2 | 3 | 5) error 202 ;; esac
-    return "${rc[1]}"
+    case ${rc[1]} in 1 | 2 | 3 | 5) error 202 ;; 4) return 4 ;; esac
+    exit "${rc[1]}"
   }
 }
 
@@ -115,15 +104,34 @@ queue() {
     query inputs/playqueue '[.children[]?+{c:.current}]|to_entries[]|
       "\(.key+1))\(if.value.ussi==.value.c then" >"else""end) \(.value|desc(.name))"|line' || :
   else
-    local u
-    u=$(ussi inputs/playqueue true "$1") || exit $?
-    http "inputs/playqueue?current=$u" PUT
+    ussi inputs/playqueue true "$1" 'inputs/playqueue?current=\(.)' PUT
   fi
+}
+
+# Fetch JSON and send the request to the uri its filter builds; no uri exits <code>, or 0 - <uri> <filter> <method> [code]
+relay() {
+  local rc
+
+  # The second wget starts with the first and reads its URL from jq, which takes the reply only when sealed with status 0
+  {
+    LC_ALL=C "${WGET[@]}" -O - "$BASE/$1" && rc=0 || rc=$?
+    printf '\0%d' "$rc"
+    exit "$rc"
+  } | jq -Rrse --arg b "$BASE" "${JQP}sealed($2|\"\\(\$b)/\\(.)\")" |
+    LC_ALL=C "${WGET[@]}" --method="$3" -O /dev/null -i - || {
+    rc=("${PIPESTATUS[@]}")
+    ((rc[0])) && error "${rc[0]}" "$1"
+    case ${rc[1]} in
+    0) error "${rc[2]}" "$1" ;;
+    4) ((${4-0})) && error "$4" || return 0 ;;
+    esac
+    error 202
+  }
 }
 
 # Get or seek position (±) - [sec | min:sec]
 seek() {
-  local dur pos sign tsv val
+  local sign val
 
   if [[ -z $1 ]]; then
     query nowplaying '.transportPosition|int/1000|floor'
@@ -136,31 +144,50 @@ seek() {
     error 201
   fi
 
-  tsv=$(query nowplaying '[(.transportPosition|int),(.duration|int)]|@tsv')
-  pos=${tsv%$'\t'*} dur=${tsv#*$'\t'}
-  ((dur)) || return 0
-  val=$((val * 1000))
-
-  case $sign in
-  +) ((val += pos)) || : ;;
-  -) ((val = pos - val)) || : ;;
-  esac
-
-  ((val = val < 0 ? 0 : val >= dur ? dur - 1 : val)) || :
-  http "nowplaying?cmd=seek&position=$val"
+  # Nothing to seek in without a duration
+  relay nowplaying "(.duration|int)as\$d|select(\$d>0)|
+    \"nowplaying?cmd=seek&position=\\([0,${sign:+(.transportPosition|int)$sign}$((val * 1000)),\$d-1]|sort|.[1])\"" GET
 }
 
 # Get, set or adjust (±) a setting - <ussi> <key> [arg] <max>
 setting() {
   if [[ -z $3 ]]; then
     value "$1" "$2" || error 202
-  elif isnum "$3" "$4"; then
-    local val=${BASH_REMATCH[2]}
-    [[ -z ${BASH_REMATCH[1]} ]] || val=$(query "$1" "[(.\"$2\"|int)${BASH_REMATCH[0]},0,$4]|sort|.[1]")
-    http "$1?$2=$val" PUT
-  else
+  elif ! isnum "$3" "$4"; then
     error 201
+  elif [[ -z ${BASH_REMATCH[1]} ]]; then
+    http "$1?$2=${BASH_REMATCH[2]}" PUT
+  else
+    relay "$1" "\"$1?$2=\\([((.\"$2\"|tonumber?|select(.>=0 and .<=$4))//(\"\"|halt_error(5))|floor)${BASH_REMATCH[0]},0,$4]|sort|.[1])\"" PUT
   fi
+}
+
+# Print now playing info from its @sh word list on stdin
+show() {
+  local LC_ALL=C aFields bits=0 codec='' dur pos rate=0 tsv
+
+  # Nothing to read when the fetch failed; now reports it
+  read -r -d '' tsv || [[ -n $tsv ]] || return 0
+  eval "aFields=($tsv)"
+
+  # Spotify: UNKNOWN CODEC, or FLAC without bit rate - take codec, depth and bit rate from the player API, best effort
+  if [[ ${aFields[3]} == UNKNOWN* || ${aFields[3]} == FLAC && ${aFields[6]} == 0 ]]; then
+    tsv=$(BASE=${BASE%:*}/api query "getData?path=player:player/data&roles=value" '.[0].trackRoles.mediaData|
+      .resources[0]?|[(.codec|strings|capture("\\((?<c>[^()]+?)(?: (?<b>[0-9]+) ?bit)?\\)$"))//{},
+      (.bitRate|int/1000)]|@sh "codec=\(.[0].c//"") bits=\(.[0].b|int) rate=\(.[1])"|line' 2>/dev/null) || tsv=
+    eval "$tsv"
+
+    [[ ${codec:-UNKNOWN} == UNKNOWN ]] || aFields[3]=$codec
+    ((${bits:-0})) && aFields[5]=$bits || :
+    [[ ${rate:-0} == 0 ]] || aFields[6]=$rate
+  fi
+
+  pos=$((aFields[1] / 1000 % 60 + 100)) dur=$((aFields[2] / 1000 % 60 + 100))
+  aFields[1]=$((aFields[1] / 60000)):${pos#1} aFields[2]=$((aFields[2] / 60000)):${dur#1}
+
+  aFields[3]=${aFields[3]#audio/}
+  aFields[7]=${aFields[7]#inputs/}
+  printf '%s\n%s / %s - %s %gkHz %dbit %gkb/s [%s]\n' "${aFields[@]}"
 }
 
 # Get, set (min) or cancel (0) sleep timer - [arg]
@@ -183,8 +210,7 @@ timer() {
 usage() {
   local nm=${0##*/}
 
-  cat <<EOF
-$nm 10.5 - Control Naim Mu-so 2nd generation over HTTP
+  printf '%s\n' "$nm 11.0 - Control Naim Mu-so 2nd generation over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -216,18 +242,18 @@ Information:
 Omit the argument to read the current value.
 Numeric settings accept a relative value (e.g. vol +5, seek -30), except sleep.
 Seek also accepts a min:sec position or offset (e.g. 3:39, -1:30).
-Information options accept a key (e.g. levels volume).
-EOF
+Information options accept a key (e.g. levels volume)."
 }
 
-# Resolve item index to ussi - <uri> <filter> <index>
+# Resolve item index to ussi and send a request with it - <uri> <filter> <index> <uri, ussi as \(.)> <method>
 ussi() {
   [[ $3 =~ ^[1-9][0-9]?$ ]] || error 201
-  query "$1" "[.children[]?|select($2)][$3-1].ussi|some" || error 201
+  relay "$1" "[.children[]?|select($2)][$3-1].ussi|some|
+    if type==\"string\"and test(\"\\\\A[[:alnum:]/:._~-]+\\\\z\")then\"$4\"else\"\"|halt_error(5)end" "$5" 201
 }
 
 # Get single JSON value - <ussi> <key>
-value() { query "$1" ".\"$2\"|some|safe"; }
+value() { query "$1" ".\"$2\"|val"; }
 
 (($# < 3)) || error 201
 opt=${1-}
@@ -253,8 +279,11 @@ wifi | wired | wireless)
 esac
 
 # Options that take no argument
-[[ -z $arg || $opt != @(-h|--help|artwork|clear|description|help|next|now|play|playpause|prev|standby|stop|wake) ]] ||
-  error 201
+case $opt in
+'' | -h | --help | artwork | clear | description | help | next | now | play | playpause | prev | standby | stop | wake)
+  (($# < 2)) || error 201
+  ;;
+esac
 
 # Main dispatcher
 case $opt in
@@ -345,7 +374,7 @@ inputs/bluetooth | system/capabilities | inputs/hdmi | levels | network | nowpla
   ;;
 --dump)
   [[ $arg =~ ^[[:alnum:]/:_-]{3,64}$ ]] || error 201
-  query "$arg" safe || error 202
+  query "$arg" val || error 202
   ;;
 *)
   error 200

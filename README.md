@@ -1,4 +1,4 @@
-<!-- 10.5 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
+<!-- 11.0 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -6,14 +6,14 @@ A small Bash script that controls a **Naim Mu-so 2** from the command line, over
 
 Two interchangeable versions are included:
 
-| Script        | Uses   | Best for                                                |
-| ------------- | ------ | ------------------------------------------------------- |
-| `msc.sh`      | `wget` | Linux, and macOS with Homebrew `wget` (slightly faster) |
-| `msc-curl.sh` | `curl` | macOS and Git Bash on Windows (`curl` is preinstalled)  |
+| Script        | Uses   | Best for                                               |
+| ------------- | ------ | ------------------------------------------------------ |
+| `msc.sh`      | `wget` | Linux, and macOS with Homebrew `wget`                  |
+| `msc-curl.sh` | `curl` | macOS and Git Bash on Windows (`curl` is preinstalled) |
 
 Both take the same options and behave identically - pick whichever tool you already have.
 
-This is **version 10.5**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new.
+This is **version 11.0**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new. If you are on 10.5, upgrade: that release does not run on the Bash macOS ships.
 
 ## Requirements
 
@@ -56,7 +56,7 @@ msc.sh <option> [argument]
 
 Numeric options print the current value when called without an argument, and accept a **relative** value prefixed with `+` or `-` - `sleep` being the one exception. Write numbers without leading zeros - `vol 8`, not `vol 08`. Information options accept a key to print a single field.
 
-Options that only act - `wake`, `play`, `vol 40` - print nothing at all, whether to a terminal or into a pipe; the exit code tells you whether they worked. An option that takes no argument rejects one instead of ignoring it, so `stop now` fails rather than stopping.
+Options that only act - `wake`, `play`, `vol 40` - print nothing at all, whether to a terminal or into a pipe; the exit code tells you whether they worked. An option that takes no argument rejects one instead of ignoring it, so `stop now` fails rather than stopping - and so does `stop ""`, where an empty argument is still an argument.
 
 Ranges written as `0..n` are settings; ranges written as `1..n` are positions in a list.
 
@@ -335,16 +335,16 @@ sudo apt install jq
 
 ## Exit codes
 
-| Code                                                 | Meaning                                                                                 |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `0`                                                  | Success                                                                                 |
-| `4` (wget) / `6`, `7`, `18`, `28`, `52`, `56` (curl) | Network failure - speaker offline, timed out, wrong address or reply cut off            |
-| `8` (wget) / `22`, `47` (curl)                       | Server error - the speaker is probably in standby                                       |
-| `200`                                                | Missing or invalid option                                                               |
-| `201`                                                | Missing or invalid argument                                                             |
-| `202`                                                | The speaker returned nothing, invalid JSON, more than one JSON value, or an empty value |
+| Code                                                 | Meaning                                                                                                                |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `0`                                                  | Success                                                                                                                |
+| `4` (wget) / `6`, `7`, `18`, `28`, `52`, `56` (curl) | Network failure - speaker offline, timed out, wrong address or reply cut off                                           |
+| `8` (wget) / `22`, `47` (curl)                       | Server error - the speaker is probably in standby                                                                      |
+| `200`                                                | Missing or invalid option                                                                                              |
+| `201`                                                | Missing or invalid argument                                                                                            |
+| `202`                                                | The speaker returned nothing, invalid JSON, more than one JSON value, an empty value, or a value the script cannot use |
 
-A server error names the API endpoint the request went to - `Server error on levels, Mu-so in standby?` - so it is clear which request failed. The other messages are unchanged: a network failure hits every endpoint alike, so there is nothing to name.
+A server error names the API endpoint the request went to - `Server error on levels, Mu-so in standby?` - so it is clear which request failed. A command that reads before it writes - a relative setting, `seek`, or picking an item by number - names the endpoint it read, whichever of its two requests failed. The other messages are unchanged: a network failure hits every endpoint alike, so there is nothing to name.
 
 Redirects are refused rather than followed: the API never issues one, so a redirect means the reply did not come from the speaker. Both report it as a server error: `msc.sh` exits `8`, `msc-curl.sh` `47`.
 

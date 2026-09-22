@@ -1,81 +1,40 @@
-<!-- 10.5 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
+<!-- 11.0 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
 
-10.5 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 10.5 is where you started.
+11.0 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 11.0 is where you started.
 
-## 10.5 - September 2026
+## 11.0 - September 2026
 
-The format of a Spotify lossless stream on the `now` line, the current track's artwork, names that match the app, replies held to exactly what the speaker should send, and less work per command.
+The main focus is performance, and fixing the final safety and security issues - what the speaker sends back is now checked before the script acts on it. A regression that stopped 10.5 running on the Bash macOS ships is fixed along the way.
 
-- **`now` shows the format of a Spotify lossless stream.** The speaker's API reports these as `UNKNOWN CODEC`, or as `FLAC` with a bit rate of 0. When `now` sees either, it makes a second, read-only request to the speaker's player API on port `80`, which names the codec, the bit depth when it is 24-bit, and the bit rate - so the line reads `FLAC 0kHz 24bit 1675.81kb/s [spotify]` instead of `UNKNOWN CODEC 0kHz 0bit 0kb/s [spotify]`. Neither API reports the sample rate, which stays `0kHz`. Other sources make that request only in the same two cases, and if port `80` doesn't answer the line is printed as before.
-- **New `artwork`**, printing the URL of the current track's artwork, ready to open.
-- **`notes` is now `description`**, the word the Naim app uses and the key the option reads. `notes` is rejected with "Missing or invalid option." **Aliases and Shortcuts still calling `notes` must switch.**
-- `wifi` is the documented name for the Wi-Fi interface, the app's own word for it; `wireless` still works as the long-form alias, so nothing breaks.
-- **A reply must be exactly one JSON value.** Two values run together, which 10.4 processed one after the other, are now reported as "Invalid response from Mu-so." and exit 202, so a corrupted reply can no longer produce two list entries to play or two values for a relative setting.
-- **C1 control characters are stripped as well.** 10.4 removed the C0 controls and DEL, but not U+0080 to U+009F, which include the 8-bit forms of CSI and OSC that some terminals act on. They are now stripped from every string the speaker returns, and from the value an information option prints for a single key when that value is an object or an array.
-- A fractional number from the speaker no longer breaks the integer arithmetic. A position or duration such as `1000.5` stopped `now` and `seek` with a Bash arithmetic error, and a relative setting took the current value as-is, so `vol +5` on `30.5` would have sent `35.5`. Position, duration, bit depth, the Spotify bit rate and the value a relative setting starts from are now rounded down. The API sends whole numbers, so in practice nothing changes.
-- A server error names the endpoint the request went to: "Server error on levels, Mu-so in standby?" instead of "Server error, Mu-so in standby?". The exit code is unchanged - `8` for `msc.sh`, `22` or `47` for `msc-curl.sh` - and the other messages are untouched.
-- An invalid JSON reply prints only "Invalid response from Mu-so." - jq's own parse error no longer appears above it. The exit code is 202, as before.
-- `msc-curl.sh` names two failures it used to report as "Unexpected curl error". A reply cut off partway (`18`) is a network failure, as `msc.sh` already reported it, and a refused redirect (`47`) is a server error, matching `msc.sh`'s `8`. The exit codes themselves are unchanged.
-- Each reply is streamed straight into `jq` instead of being captured first, `wget` or `curl` replaces the pipeline's subshell instead of running under it, fields are split without here-strings (which Bash 3.2 writes to a temporary file), and each call references only the jq definitions its output needs - together typically 2 to 6 ms less per command - _code improvements_.
-- The jq definitions consolidated: shared `int`, `num`, `line` and `kv` helpers, `desc` moved into the preamble, definitions used only once inlined, and the rest ordered by the stage they serve. The check that walks structured output looks for C1 only, since jq already escapes DEL. The preamble is now assigned before `--xdbg` turns tracing on, so the trace no longer starts with it - _code improvements_.
-- `artwork` and `description` share one branch, `inputs`, `playlists`, `stations` and `queue` resolve an index through one shared lookup, the `wifi` alias is folded into `wired` and `wireless`, and the options that take no argument are checked with a single test that skips the name match when no argument is given - _code improvements_.
+- **The scripts run on Bash 3.2 again.** 10.5 checked the options that take no argument with an extended glob - `@(-h|--help|artwork|...)` - inside `[[ ]]`. Bash 4.1 and newer enable that syntax there on their own; 3.2 does not, so it is a parse error, and the script dies on "syntax error in conditional expression" before it runs a single line. Every option was affected, on stock macOS and anywhere else without a newer Bash. The check is a `case` again. **Anyone who took 10.5 without a Homebrew Bash needs this release.**
+- **Commands that make two requests are faster.** A relative setting such as `vol +5`, `seek`, and `inputs`, `playlists`, `stations` or `queue` with a number read from the speaker first and build the second request from the reply. The second `wget` or `curl` now starts alongside the first and takes its URL from `jq`, so its start-up - around 5 ms on a current Mac - overlaps the first request instead of following it. The write still waits for the whole reply: one cut short sends nothing, even when the part that did arrive is valid JSON. A server error on either request names the endpoint that was read - `levels` rather than `levels?volume=30`.
+- Smaller savings elsewhere: `now` hands the reply straight to its formatting instead of capturing it first, so its request starts sooner; `help` prints without starting a separate program; and `wget` and `curl` run in the C locale, which spares them loading locale data on every request.
+- **`now` prints `44.1kHz` under every locale, which 10.4 only half managed.** The figures were formatted by putting `LC_NUMERIC=C` in front of `printf`. `LC_ALL` in the environment outranks `LC_NUMERIC`, so a shell with `LC_ALL=de_DE.UTF-8` still read `44,1kHz` - and on Bash 3.2 the prefix never took effect at all, because that release does not reload the locale for an assignment made in front of a builtin. The locale is now set for the duration of the function, which both versions honour.
+- **A relative setting no longer writes the offset on its own.** If the reply is missing the key, or holds something that is not a number, the current value read as `0`, so `vol +5` sent `volume=5` - a drop to near-silence from whatever was playing, reported as success. It is now "Invalid response from Mu-so.", exit 202, and nothing is written.
+- **A relative setting no longer jumps to the limit on a current value it cannot trust.** `NaN`, `Infinity` or a number outside the setting's range was clamped like any other, so a reply of `Infinity` made `vol -5` write `volume=100`. It now reports 202 and writes nothing.
+- **An identifier from the speaker is checked before it goes into a URL.** `inputs 1`, `stations 1`, `playlists 1` and `queue 1` look up the item's `ussi` and paste it into the next request. A `?` in that identifier silently restructured the query string - `cmd=play` became part of a value instead of a command, so the item was never played and the script still exited 0. Identifiers are now held to the characters the API uses, and anything else reports 202.
+- A value the speaker returns as a JSON boolean prints and succeeds. `mute` and the information options printed `false` and then reported "Invalid response from Mu-so." with exit 202, because the value was correct but false.
+- A reply the script cannot use reports "Invalid response from Mu-so." on its own; `jq`'s error message no longer comes first.
+- A server error names the endpoint without its query string on every command, so `vol 25` reports `Server error on levels` rather than `levels?volume=25`.
+- A number too large for Bash arithmetic no longer stops `now` and `seek`. A position or duration beyond the integer range reached the arithmetic in scientific notation and ended the command on a Bash error; out-of-range and negative figures now read as `0`, the way an unreadable one already did.
+- `now` copes with a figure sent in scientific notation and a bit depth with a leading zero: `4.41E4` printed `0kHz` behind a `printf` error, and a Spotify bit depth of `08` a Bash arithmetic error.
+- A line break inside a track title no longer makes `now` print three lines. 10.4 folded line breaks in the numbered lists, `queue`, `sleep` and the `key=value` output, but the `now` line was left out.
+- An option that takes no argument rejects an empty one. `stop ""` ran, because the check asked whether the argument was empty rather than whether one was given.
 
-## 10.4 - September 2026
+## 10.x - August–September 2026
 
-A second read-through of both scripts, narrower than 10.3 and aimed at what the speaker sends back rather than what is typed in.
+The scripts read line by line, and what comes back from the speaker treated as untrusted.
 
-- **Control characters are stripped from everything the speaker returns, not just `notes`.** 10.3 cleaned the description alone, but names reach the terminal through `inputs`, `playlists`, `stations`, `queue` and `now` as well, and a name carrying control characters could still move the cursor or set colours there. The stripping now happens once, where the reply is parsed, so every option is covered. Tabs survive, and so do the line breaks in `notes`.
-- **A line break inside a name or value no longer splits a listed entry across two lines.** Where the output is one entry per line - the numbered lists, `queue`, `sleep` and the `key=value` information output - a line break is folded to a space, so the numbering stays readable and a line can still be split on its first `=` or `)`. `notes` is untouched: a podcast tracklist keeps its line breaks.
-- **`now` prints `44.1kHz` under every locale.** Where `LC_NUMERIC` asked for a comma - `de_DE.UTF-8` and `fr_FR.UTF-8` among others - the sample rate and bit rate read `44,1kHz` and `1,411kb/s`. The figures are now formatted in the C locale regardless of the environment.
-- A track known only by its album or station no longer gains a leading space. `now` and `queue` printed `" [Kind of Blue]"` where the artist and title were both missing or empty.
-- An empty reply from the speaker is reported as "Invalid response from Mu-so." and exits 202, where it used to print nothing and succeed. A reply that parses but holds no matching keys is unchanged: a bare `sleep` with no timer keys and an empty list still print nothing and exit 0.
-- Reading a setting that comes back as an empty string reports 202, which is what the missing-value case already did, rather than printing a blank line and succeeding.
-- `help`, `-h` and `--help` reject a stray argument, the way the other options that take none have since 10.3. `help stop` now prints "Missing or invalid argument." and exits 201 instead of printing the usage.
-- `--xdbg` no longer exits before it traces anything on the later Bash 4 releases. `EPOCHREALTIME`, which the trace reads for its timings, arrived in Bash 5.0, and by the end of the Bash 4 line `set -u` had come to treat a substitution on an unset name as a fatal error rather than an empty string - so the flag ended the script on "EPOCHREALTIME: unbound variable" instead of tracing. It now falls back to a fixed `0.0` where the shell has no clock of its own, which leaves the trace running and the millisecond column reading `0` throughout - what Bash 3.2 has shown all along.
-- The sign of a relative `seek` is now captured with the value instead of being read back from the match state after the position has been fetched - a regex added anywhere in between would have silently changed which way `seek +30` moved - _code improvements_.
-
-## 10.3 - August 2026
-
-A full read-through of both scripts, and the edge cases it turned up closed - two of them worth reading before you upgrade.
-
-- Every option, argument form and error path was checked line by line against the rest, with three models reading independently (GPT-5.6 Sol, Kimi K3 and Claude Opus 5), and the edge cases they turned up closed.
-- **An option that takes no argument now rejects one instead of ignoring it.** `clear`, `next`, `notes`, `now`, `play`, `pause`, `prev`, `standby`, `stop` and `wake` used to run whatever followed them, so `stop now` stopped and `clear queue` cleared, both exiting 0. They now print "Missing or invalid argument." and exit 201. **Aliases and Shortcuts that pass a stray word to one of these must drop it.**
-- A redirect is refused rather than followed, in both versions. The API never issues one, so a redirect means the reply did not come from the speaker - and the two versions disagreed about it: `wget` followed it, while `curl` sent writes to the redirecting address and reported success without ever reaching the target. `msc.sh` now reports it as `8`, `msc-curl.sh` as `47`.
-- `notes` strips the control characters in the description, not just the carriage returns, so text embedded in a file's comments cannot move the cursor or set colours in the terminal it is printed to. Line breaks and tabs survive.
-- `now` and `queue` treat an empty string from the speaker the way they already treated a missing key. A station reported with an empty `albumName` keeps its name in the brackets, and an empty `codec` or `sourceDetail` falls back to the MIME type and the source instead of reading `UNKNOWN`.
-- Information options take a key of 3 to 32 characters and accept `_` and `-` in it, where the check was 3 to 24 alphanumerics - the "any key" the documentation describes, rather than a narrower set it never mentioned. Three is the shortest key the speaker returns on any node (`cpu`, `uri`, `wac`).
-- The README now names the `wget` the script needs: GNU Wget 1.19.2 or newer, for `--no-netrc`, `--no-config` and `--method`. BusyBox's `wget` takes none of the three.
-- A bare `sleep` with no timer keys in the reply prints nothing and succeeds, the way a bare `queue`, `notes` and the empty lists already did, rather than exiting on the empty result.
-- The query strings passed to the request helper are quoted, so a `?` or `*` in an option's URI is never matched against filenames in the working directory.
-- `msc-curl.sh` no longer passes `--tcp-fastopen`. It saved no measurable time against the speaker, needed curl 7.49 or newer, and is left out of the Windows builds the script is documented for - where curl refuses the option outright and exits `4`, a code the script had no message for. **A Git Bash install that was failing every request with "Unexpected curl error 4." now works.**
-
-## 10.2 - August 2026
-
-A track position written the way it is read back.
-
-- **`seek` now takes a `min:sec` position as well as a number of seconds.** `seek 3:39` is `seek 219`, so the figure `now` prints as `3:39` can be typed straight back in without doing the arithmetic. The seconds are always two digits (`3:09`, not `3:9`); the minutes may be written either way.
-- **The relative `+` and `-` work on that form too**, so `seek -1:30` rewinds a minute and a half and `seek +0:30` skips forward half a minute. Both forms clamp the same way they always did - past the end of the track lands just short of it, before the start lands at `0` - and seeking with nothing playing still does nothing and succeeds.
-- **The upper bound is `3599`, where it was `3600`.** `seek 3600` is now rejected with "Missing or invalid argument.", which keeps the two forms to the same range: one second short of the hour, matching `59:59`. It only ever mattered on a track over an hour long, where the second was clamped away in any case. **Scripts passing a literal `3600` need changing.**
-- The position lookup, the relative arithmetic and the clamping moved out of the seconds branch and now run once for whichever form was given, and the usage screen gained a line for the new syntax - _code improvements_.
-
-## 10.1 - August 2026
-
-Something the speaker already knew and the script never asked it for: the notes behind the track that is playing.
-
-- **New `notes`** (long-form alias: `description`), printing the description embedded in the current track's comments - show notes, and on a podcast often the full tracklist. Nothing to show prints nothing and succeeds, and the carriage returns in the text are stripped.
-- **A network failure while resolving `stations 2`, `playlists 1` or `queue 5` is reported for what it is.** The lookup runs in a subshell, so the `exit` that should have ended the script only ended the subshell: the real message ("Mu-so offline?") was printed, then followed by "Missing or invalid argument." and exit 201, whatever had actually gone wrong. The genuine exit code now propagates, and 201 is left to mean what it says - an index outside the list. **Scripts that read 201 from those three options as "unreachable" need changing.**
-- The internal `sleep` helper renamed to `timer`, so it no longer shadows the shell's own `sleep`; the `wget` and `curl` invocations were cut back to the flags that measurably earn their place, `curl` no longer pinning `--http1.1` and `wget` no longer passing `--no-iri`, neither of which changed what goes over the wire to the speaker; and the `--xdbg` trace rounds its millisecond timings instead of truncating them - _code improvements_.
-
-## 10.0 - August 2026
-
-**The version that goes out.** 9.5 was meant to be the end of it, and in behaviour it nearly was. What was left is the naming: the last two options without a long-form name now have one, so every option in the script reads the same way.
-
-- **`lipsync` and `pairing` now have long-form aliases: `delay` and `open`.** Each is the name of the key the option writes - `delay` on the HDMI input, `open` on the Bluetooth input - the way `roomcomp`/`position` and `autostandby`/`standbyTimeout` already read. The short names remain the documented ones, and both spellings work, so nothing breaks.
-- Error messages collected into one variable and printed with a single `printf` rather than a `case` of `echo`s, and the option aliases put in dispatcher order - _code improvements_.
+- **10.0** - **`lipsync` and `pairing` gained the long-form aliases `delay` and `open`**, each the name of the key it writes, so every option in the script now has one.
+- **10.1** - **New `notes`** (later renamed `description`), printing the description embedded in the current track's comments - show notes, and on a podcast often the full tracklist. **A network failure while resolving `stations 2`, `playlists 1` or `queue 5` reports what actually went wrong**, instead of the lookup's subshell swallowing it and reporting 201.
+- **10.2** - **`seek` takes a `min:sec` position as well as seconds**, so `seek 3:39` is `seek 219` and `seek -1:30` rewinds a minute and a half. **The upper bound became `3599`, where it was `3600`.**
+- **10.3** - A full read-through of both scripts, with three models reading independently. **Options that take no argument reject one instead of ignoring it**, so `stop now` fails rather than stopping. Redirects are refused rather than followed. Control characters are stripped from the description, and information options take a key of 3 to 32 characters. **`msc-curl.sh` no longer passes `--tcp-fastopen`, which had been failing every request under Git Bash on Windows with "Unexpected curl error 4."**
+- **10.4** - **Control characters are stripped from everything the speaker returns**, not just the description, and a line break inside a name no longer splits a listed entry across two lines. An empty reply reports 202 rather than printing nothing and succeeding, `help` rejects a stray argument, and `--xdbg` traces again on the later Bash 4 releases.
+- **10.5** - **`now` shows the format of a Spotify lossless stream**, taking the codec, bit depth and bit rate from a second read-only request to the player API on port `80` where the main API reports `UNKNOWN CODEC`. New `artwork`, printing the current track's artwork URL. **`notes` became `description`**, the word the Naim app uses. A reply must be exactly one JSON value, and the C1 control characters are stripped alongside the C0 ones.
 
 ## 9.x - August 2026
 
