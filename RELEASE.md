@@ -1,10 +1,18 @@
-<!-- 11.0 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
+<!-- 11.1 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
 
-11.0 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 11.0 is where you started.
+11.1 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 11.1 is where you started.
+
+## 11.1 - October 2026
+
+The active input marked in `inputs`.
+
+- **`inputs` marks the active input with a leading `>`**, the way `queue` marks the current track. The input list carries no such flag, so the source is taken from `nowplaying`, read in a second request that starts alongside the first and adds no noticeable time. When that request fails, or the source is one the list leaves out - AirPlay, say - the list prints with nothing marked.
+- `queue` and `inputs` mark an entry only when the speaker names the current track or source. An entry without an identifier was marked with `>` when there was nothing to compare it with.
+- An information option with nothing beyond the housekeeping keys prints nothing and succeeds. It exited `4` without a message - with `wget`, the code for a network failure.
 
 ## 11.0 - September 2026
 

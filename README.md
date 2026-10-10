@@ -1,4 +1,4 @@
-<!-- 11.0 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
+<!-- 11.1 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -13,7 +13,7 @@ Two interchangeable versions are included:
 
 Both take the same options and behave identically - pick whichever tool you already have.
 
-This is **version 11.0**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new. If you are on 10.5, upgrade: that release does not run on the Bash macOS ships.
+This is **version 11.1**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new. If you are on 10.5, upgrade: that release does not run on the Bash macOS ships.
 
 ## Requirements
 
@@ -82,6 +82,8 @@ A bare `sleep` prints `sleepActive` and `sleepPeriod` (the period in seconds). T
 | `stations [1..n]`  | List radio favourites, or play station _n_     |
 
 `inputs` lists the inputs the speaker reports as selectable and not disabled, numbered from 1. The numbering follows that list, so it shifts if you enable or disable an input in the Naim app. Services the speaker doesn't mark selectable - Qobuz and Tidal, typically - are not listed and cannot be selected this way; use `qobuz` or `tidal` to inspect their state.
+
+The active input - the source of what is playing - is marked with a leading `>`, as the current track is in `queue`. When the speaker can't report it, or it is an input the list leaves out - AirPlay, say - nothing is marked.
 
 `playlists` and `stations` both read the favourites list, each filtered to its own kind: the favourites whose class ends in `Playlist` - the playlists you saved from a streaming service or a UPnP server - and the radio favourites. Passing an index plays that entry, the same way `stations 2` starts a station.
 
@@ -200,7 +202,7 @@ Print all fields, or a single field when given a key.
 | `wifi`         | Wi-Fi interface details, signal and link quality (alias: `wireless`) |
 | `wired`        | Ethernet interface details                                           |
 
-Housekeeping keys the API repeats on every node (`version`, `changestamp`, `name`, `ussi`, `class`, `cpu`, `children`) are left out; everything else the node returns is printed as `key=value`.
+Housekeeping keys the API repeats on every node (`version`, `changestamp`, `name`, `ussi`, `class`, `cpu`, `children`) are left out; everything else the node returns is printed as `key=value`. A node with nothing beyond them prints nothing and succeeds.
 
 `help` - or no arguments at all - prints the built-in usage screen. `-h` and `--help` do the same. Like the other options that take no argument, all three reject a stray one, so `help stop` fails rather than printing the usage.
 
@@ -224,7 +226,7 @@ msc.sh playlists             # 1) Sunday Morning
                              # 2) Late Night Jazz
 msc.sh playlists 1           # play Sunday Morning
 
-msc.sh inputs                # 1) HDMI
+msc.sh inputs                # 1) > HDMI
                              # 2) Internet Radio
                              # 3) Spotify
                              # 4) Playqueue

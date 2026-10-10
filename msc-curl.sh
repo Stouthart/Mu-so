@@ -2,17 +2,15 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# API base, and curl with the options every request shares
 BASE=http://${MUSO_IP:-mu-so}:15081
 CURL=(curl -q -s --noproxy '*' -4 -m2 -HUser-Agent: -f -L --max-redirs 0)
 
-# jq preamble - reply: filter the one JSON value read; none, invalid JSON, more than one or a failing filter exits 5
-# quietly - <filter>; sealed: reply on a raw read that ends in NUL and the reader's exit status, only when that is 0;
-# int: whole number or 0, num: number or 0, some: drop null/empty;
-# ctl: strip C0/C1 controls from a string, rec: ctl throughout, safe: ctl for any type (jq -r escapes C0 and DEL
-# in JSON, so it walks only on C1); line: fold line breaks and strip controls, kv: key=value line;
-# val: a value to print, booleans as text; desc: format "artist / title [album]" - <title-key>
-# Unreferenced defs cost nothing; each caller appends only the sanitizer its output needs
+# jq: reply(f) filters one JSON value; missing/invalid/multiple values or filter errors exit 5 silently.
+# sealed(f): reply on raw JSON followed by NUL and reader status 0.
+# int/num: integer/number or 0; some: drop null/empty; ctl/rec: strip C0/C1 controls (string/recursive).
+# safe: ctl for any type, rec only for C1 (jq -r escapes C0/DEL in JSON); line: fold breaks, strip controls.
+# kv: key=value line; val: printable value, booleans as text; desc(t): "artist / title [album]", t is the title.
+# Unused defs cost nothing; callers append only the sanitizer their output needs.
 JQP='def reply(f):try([inputs]|if length==1 then .[0] else error end|f)catch(""|halt_error(5));
 def sealed(f):try(split("\u0000")|if length==2 and .[1]=="0" then .[0]|fromjson else error end|f)catch(""|halt_error(5));
 def num:(tonumber?|select(.>=0 and .<9007199254740992))//0;
@@ -29,12 +27,12 @@ def desc(t):[([.artistName,t]-[null,""]|join(" / ")),((.albumName|some)//(.stati
 [[ ${1-} == --xdbg ]] && {
   shift
   PS4='+\e[5G\e[36m$(((${EPOCHREALTIME/./}-_ERT+500)/1000))\e[9G\e[33m$LINENO\e[13G\e[90m>\e[15G\e[m'
-  : "${EPOCHREALTIME=0}" # Unset before bash 5: set -u aborts the strip below on bash 4; the timing column reads 0
+  : "${EPOCHREALTIME=0}" # Bash <5: avoid set -u failure; timing stays 0
   readonly _ERT=${EPOCHREALTIME/./}
   set -x
 }
 
-# Print error and exit - <code> [uri]
+# Report and exit - <code> [uri]
 error() {
   local msg
 
@@ -51,12 +49,12 @@ error() {
   exit "$1"
 }
 
-# Send HTTP request, exec'd with output (pipe only); curl starts faster in the C locale - <uri> [method] [output]
+# <uri> [method] [output]; explicit output uses exec (pipe only); C locale speeds startup
 http() {
   LC_ALL=C ${3+exec} "${CURL[@]}" -X "${2:-GET}" -o "${3:-/dev/null}" "$BASE/$1" || error $? "${1%%[?]*}"
 }
 
-# Valid number within max? Sets BASH_REMATCH - <arg> <max>
+# Number within max; sets BASH_REMATCH - <arg> <max>
 isnum() {
   [[ $1 =~ ^([+-]?)(0|[1-9][0-9]{0,3})$ && ${BASH_REMATCH[2]} -le $2 ]]
 }
@@ -70,11 +68,10 @@ list() {
   fi
 }
 
-# Show now playing info
 now() {
   local rc
 
-  # Piped into show rather than captured, so wget starts a fork sooner
+  # Piping to show starts the HTTP client a fork sooner
   http nowplaying GET - | jq -nre "${JQP}reply("'[desc(.title),(.transportPosition|int),(.duration|int),
     (.codec|some)//.mimeType,(.sampleRate|num/1000),(.bitDepth|int),(.bitRate|num/1000),
     (.sourceDetail|some)//.source]|map(if.==null or.==""then"UNKNOWN"else. end)|@sh|line)' | show || {
@@ -85,35 +82,51 @@ now() {
   }
 }
 
-# Fetch JSON, exit on error; returns 4 when the filter prints nothing - <uri> <filter, ending in its sanitizer>
+# Fetch JSON; exit on error, return 4 on no output - <uri> <filter ending in sanitizer> [jq args]
 query() {
-  local rc
+  local rc uri=$1 filter=$2
 
-  # Streamed, not captured
-  http "$1" GET - | jq -nre "${JQP}reply($2)" || {
+  # Bash 3.2 joins "${@:3}" under this IFS
+  shift 2
+  http "$uri" GET - | jq -nre "${JQP}reply($filter)" "$@" || {
     rc=("${PIPESTATUS[@]}")
-    ((rc[0])) && error "${rc[0]}" "$1"
+    ((rc[0])) && error "${rc[0]}" "$uri"
     case ${rc[1]} in 1 | 2 | 3 | 5) error 202 ;; 4) return 4 ;; esac
     exit "${rc[1]}"
   }
+}
+
+# List or start inputs; mark nowplaying's source - [index]
+inputs() {
+  local f='.selectable=="1"and.disabled!="1"'
+
+  if [[ -z $1 ]]; then
+    # Fetch nowplaying concurrently; failure leaves inputs unmarked.
+    # fd 3 keeps Bash 3.2 from closing the substitution before query runs.
+    exec 3< <(http nowplaying GET -)
+    query inputs "(try(\$n|fromjson|.source)catch null)as\$s|[.children[]?|select($f)]|to_entries[]|
+      \"\\(.key+1))\\(if\$s!=null and.value.ussi==\$s then\" >\"else\"\"end) \\(.value.name)\"|line" --rawfile n /dev/fd/3 || :
+  else
+    list inputs "$f" "$1"
+  fi
 }
 
 # List or jump to playqueue track - [index]
 queue() {
   if [[ -z $1 ]]; then
     query inputs/playqueue '[.children[]?+{c:.current}]|to_entries[]|
-      "\(.key+1))\(if.value.ussi==.value.c then" >"else""end) \(.value|desc(.name))"|line' || :
+      "\(.key+1))\(if.value.c!=null and.value.ussi==.value.c then" >"else""end) \(.value|desc(.name))"|line' || :
   else
     ussi inputs/playqueue true "$1" 'inputs/playqueue?current=\(.)' PUT
   fi
 }
 
-# Fetch JSON and send the request to the uri its filter builds; no uri exits <code>, or 0 - <uri> <filter> <method> [code]
+# Fetch JSON, request URI from filter; no URI exits [code] or 0 - <uri> <filter> <method> [code]
 relay() {
   local rc
 
-  # The second curl starts with the first and reads its URL from jq, silent when jq has none; jq takes the reply only when
-  # it is sealed with status 0
+  # Start both clients together; jq supplies the second's URL only for replies sealed with status 0
+  # Suppress curl's error when jq emits no URL
   {
     LC_ALL=C "${CURL[@]}" -o - "$BASE/$1" && rc=0 || rc=$?
     printf '\0%d' "$rc"
@@ -145,7 +158,6 @@ seek() {
     error 201
   fi
 
-  # Nothing to seek in without a duration
   relay nowplaying "(.duration|int)as\$d|select(\$d>0)|
     \"nowplaying?cmd=seek&position=\\([0,${sign:+(.transportPosition|int)$sign}$((val * 1000)),\$d-1]|sort|.[1])\"" GET
 }
@@ -159,19 +171,20 @@ setting() {
   elif [[ -z ${BASH_REMATCH[1]} ]]; then
     http "$1?$2=${BASH_REMATCH[2]}" PUT
   else
-    relay "$1" "\"$1?$2=\\([((.\"$2\"|tonumber?|select(.>=0 and .<=$4))//(\"\"|halt_error(5))|floor)${BASH_REMATCH[0]},0,$4]|sort|.[1])\"" PUT
+    relay "$1" "((.\"$2\"|tonumber?|select(.>=0 and .<=$4))//(\"\"|halt_error(5))|floor)as\$v|
+      \"$1?$2=\\([\$v${BASH_REMATCH[0]},0,$4]|sort|.[1])\"" PUT
   fi
 }
 
-# Print now playing info from its @sh word list on stdin
+# Format nowplaying's @sh word list from stdin
 show() {
   local LC_ALL=C aFields bits=0 codec='' dur pos rate=0 tsv
 
-  # Nothing to read when the fetch failed; now reports it
+  # Empty input: now reports fetch failures
   read -r -d '' tsv || [[ -n $tsv ]] || return 0
   eval "aFields=($tsv)"
 
-  # Spotify: UNKNOWN CODEC, or FLAC without bit rate - take codec, depth and bit rate from the player API, best effort
+  # Spotify: try player API for codec, depth and bit rate on UNKNOWN codec or FLAC without bit rate
   if [[ ${aFields[3]} == UNKNOWN* || ${aFields[3]} == FLAC && ${aFields[6]} == 0 ]]; then
     tsv=$(BASE=${BASE%:*}/api query "getData?path=player:player/data&roles=value" '.[0].trackRoles.mediaData|
       .resources[0]?|[(.codec|strings|capture("\\((?<c>[^()]+?)(?: (?<b>[0-9]+) ?bit)?\\)$"))//{},
@@ -207,11 +220,10 @@ timer() {
   fi
 }
 
-# Show usage
 usage() {
   local nm=${0##*/}
 
-  printf '%s\n' "$nm 11.0 - Control Naim Mu-so 2nd generation over HTTP
+  printf '%s\n' "$nm 11.1 - Control Naim Mu-so 2nd generation over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
@@ -246,14 +258,14 @@ Seek also accepts a min:sec position or offset (e.g. 3:39, -1:30).
 Information options accept a key (e.g. levels volume)."
 }
 
-# Resolve item index to ussi and send a request with it - <uri> <filter> <index> <uri, ussi as \(.)> <method>
+# Resolve index to ussi, then request - <uri> <filter> <index> <uri, ussi as \(.)> <method>
 ussi() {
   [[ $3 =~ ^[1-9][0-9]?$ ]] || error 201
   relay "$1" "[.children[]?|select($2)][$3-1].ussi|some|
     if type==\"string\"and test(\"\\\\A[[:alnum:]/:._~-]+\\\\z\")then\"$4\"else\"\"|halt_error(5)end" "$5" 201
 }
 
-# Get single JSON value - <ussi> <key>
+# <ussi> <key>
 value() { query "$1" ".\"$2\"|val"; }
 
 (($# < 3)) || error 201
@@ -279,14 +291,13 @@ wifi | wired | wireless)
   ;;
 esac
 
-# Options that take no argument
+# No-argument options
 case $opt in
 '' | -h | --help | artwork | clear | description | help | next | now | play | playpause | prev | standby | stop | wake)
   (($# < 2)) || error 201
   ;;
 esac
 
-# Main dispatcher
 case $opt in
 autostandby | standbyTimeout)
   setting power standbyTimeout "$arg" 120
@@ -301,7 +312,7 @@ wake)
   http 'power?system=on' PUT
   ;;
 inputs)
-  list inputs '.selectable=="1"and.disabled!="1"' "$arg"
+  inputs "$arg"
   ;;
 playlists)
   list 'favourites?sort=A:timeStamp' '.favouriteClass//""|endswith("Playlist")' "$arg"
@@ -363,7 +374,7 @@ roomcomp | position)
 inputs/bluetooth | system/capabilities | inputs/hdmi | levels | network | nowplaying | outputs | power | \
   outputs/poweramp | inputs/qobuz | inputs/spotify | system | inputs/tidal | update | network/wired | network/wireless)
   if [[ -z $arg ]]; then
-    query "$opt" 'del(.version,.changestamp,.name,.ussi,.class,.cpu,.children)|to_entries[]|kv'
+    query "$opt" 'del(.version,.changestamp,.name,.ussi,.class,.cpu,.children)|to_entries[]|kv' || :
   elif [[ $arg =~ ^[[:alnum:]_-]{3,32}$ ]]; then
     value "$opt" "$arg" || :
   else
