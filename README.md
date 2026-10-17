@@ -1,4 +1,4 @@
-<!-- 11.1 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
+<!-- 11.2 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
 
 # Control Naim Mu-so 2nd generation over HTTP
 
@@ -13,7 +13,7 @@ Two interchangeable versions are included:
 
 Both take the same options and behave identically - pick whichever tool you already have.
 
-This is **version 11.1**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new. If you are on 10.5, upgrade: that release does not run on the Bash macOS ships.
+This is **version 11.2**, and it is the version to start from. The [release notes](RELEASE.md) record how the scripts got here; the upgrade warnings in them apply to earlier copies, so there is nothing there to act on if you are new. If you are on 10.5, upgrade: that release does not run on the Bash macOS ships.
 
 ## Requirements
 
@@ -106,7 +106,7 @@ Both list their favourites in the order you added them, oldest first, so adding 
 
 On the second line, a format or source the speaker doesn't report shows as `UNKNOWN`. When it reports no codec - on HDMI, typically - the format is taken from the stream's MIME type instead, with the `audio/` prefix stripped, so `audio/mpeg` reads as `mpeg` and `audio/x-flac` as `x-flac`. Bit rate is read as bits per second and printed in kb/s, unrounded, so a stream can read `320.5kb/s`.
 
-Spotify lossless streams are the exception the speaker's API gets wrong: it reports them as `UNKNOWN CODEC`, or as `FLAC` with a bit rate of 0. When `now` sees either, it asks the speaker's player API on port `80` - a second, read-only request - for the codec, the bit depth when it is 24-bit, and the bit rate, so a 24-bit track reads `FLAC 0kHz 24bit 1675.81kb/s`. Neither API reports Spotify's sample rate, so that stays `0kHz`. Any other source makes the extra request only in those same two cases, and if port `80` doesn't answer, the line is printed as the main API gave it.
+Spotify lossless streams are the exception the speaker's API gets wrong: it reports them as `UNKNOWN CODEC`, or as `FLAC` with a bit rate of 0. When `now` sees either, it takes the codec, the bit depth when it is 24-bit, and the bit rate from the speaker's player API on port `80`, so a 24-bit track reads `FLAC 0kHz 24bit 1675.81kb/s`. Neither API reports Spotify's sample rate, so that stays `0kHz`. That second, read-only request goes out with every `now`, just before the main one, so its answer is already on its way when it is needed; it is only read in those two cases. If port `80` doesn't answer, the line is printed as the main API gave it.
 
 `description` prints the description embedded in the comments of the track that is playing - the show notes, which on a podcast is often the full tracklist. When there is nothing to show, `description` prints nothing and succeeds. Carriage returns and the other control characters in that text (the C0 controls, DEL and the C1 range U+0080 to U+009F) are stripped - line breaks and tabs survive here, so a tracklist keeps its shape - and the text pastes cleanly into a terminal or a pipe. That stripping applies to every option, not just this one: any text arriving from the speaker is cleaned the same way. Where the output is one entry per line - the numbered lists, `queue`, `sleep` and the `key=value` information output - a line break inside a name or value is folded to a space as well, so an entry can never spill onto a second line. `description` covers the current track only - there is no per-entry equivalent for the playqueue.
 

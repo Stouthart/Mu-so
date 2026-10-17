@@ -1,10 +1,17 @@
-<!-- 11.1 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
+<!-- 11.2 - Copyright (C) 2025-2026 Stouthart. All rights reserved. -->
 
 # Release notes
 
 Highlights per major version, newest first. Point releases are listed where they changed behaviour; releases marked _code improvements_ changed nothing a user would notice.
 
-11.1 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 11.1 is where you started.
+11.2 is the version distributed. Everything below it is how the scripts got there: the bold upgrade warnings in those entries concern copies of earlier versions, and there is nothing in them to act on if 11.2 is where you started.
+
+## 11.2 - October 2026
+
+A faster `now` on Spotify.
+
+- **`now` is about 14 ms faster on Spotify and with nothing playing** - 44 ms down to 30 on the speaker. In both cases the speaker's API reports `UNKNOWN CODEC`, or `FLAC` without a bit rate, and `now` reads the format from the player API on port `80` instead. That request used to wait for the first reply; it now goes out first, since port `80` is the slower of the two, and is read only when it is needed. Other sources pay about 0.75 ms for the request they don't use.
+- `now` does less after the reply arrives: Bash 4.1 and newer read `jq`'s output in one go rather than a byte at a time, and the C locale is set while the reply is on its way instead of being switched and restored around the output.
 
 ## 11.1 - October 2026
 

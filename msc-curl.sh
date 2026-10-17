@@ -12,17 +12,19 @@ CURL=(curl -q -s --noproxy '*' -4 -m2 -HUser-Agent: -f -L --max-redirs 0)
 # kv: key=value line; val: printable value, booleans as text; desc(t): "artist / title [album]", t is the title.
 # Unused defs cost nothing; callers append only the sanitizer their output needs.
 JQP='def reply(f):try([inputs]|if length==1 then .[0] else error end|f)catch(""|halt_error(5));
-def sealed(f):try(split("\u0000")|if length==2 and .[1]=="0" then .[0]|fromjson else error end|f)catch(""|halt_error(5));
+def sealed(f):try(split("\u0000")|if length==2 and .[1]=="0"then .[0]|fromjson else error end|f)catch(""|halt_error(5));
 def num:(tonumber?|select(.>=0 and .<9007199254740992))//0;
 def int:num|floor;
 def some:select(.!=null and .!="");
 def ctl:gsub("[\\x00-\\x08\\x0b-\\x1f\u007f-\u009f]";"");
-def rec:if type=="string"then ctl elif type=="array"then map(rec)elif type=="object"then with_entries(.key|=rec|.value|=rec)else. end;
+def rec:if type=="string"then ctl elif type=="array"then map(rec)
+  elif type=="object"then with_entries(.key|=rec|.value|=rec)else. end;
 def safe:if type=="string"then ctl elif(tojson|test("[\u0080-\u009f]"))then rec else. end;
 def line:gsub("(?<l>\\x0a)|[\\x00-\\x08\\x0b-\\x1f\u007f-\u009f]";if.l then" "else""end);
 def kv:"\(.key)=\(.value)"|line;
 def val:some|if type=="boolean"then tostring else safe end;
-def desc(t):[([.artistName,t]-[null,""]|join(" / ")),((.albumName|some)//(.station|some)|"[\(.)]")]|map(some)|join(" ");'
+def desc(t):[([.artistName,t]-[null,""]|join(" / ")),
+  ((.albumName|some)//(.station|some)|"[\(.)]")]|map(some)|join(" ");'
 
 [[ ${1-} == --xdbg ]] && {
   shift
@@ -71,6 +73,14 @@ list() {
 now() {
   local rc
 
+  # Spotify: the player API's codec, depth and bit rate, read by show only when needed.
+  # Started first: port 80 answers slower than nowplaying.
+  exec 3< <(
+    exec 2>/dev/null
+    BASE=${BASE%:*}/api query "getData?path=player:player/data&roles=value" '.[0].trackRoles.mediaData|
+      .resources[0]?|[(.codec|strings|capture("\\((?<c>[^()]+?)(?: (?<b>[0-9]+) ?bit)?\\)$"))//{},
+      (.bitRate|int/1000)]|@sh "codec=\(.[0].c//"") bits=\(.[0].b|int) rate=\(.[1])"|line'
+  )
   # Piping to show starts the HTTP client a fork sooner
   http nowplaying GET - | jq -nre "${JQP}reply("'[desc(.title),(.transportPosition|int),(.duration|int),
     (.codec|some)//.mimeType,(.sampleRate|num/1000),(.bitDepth|int),(.bitRate|num/1000),
@@ -105,7 +115,8 @@ inputs() {
     # fd 3 keeps Bash 3.2 from closing the substitution before query runs.
     exec 3< <(http nowplaying GET -)
     query inputs "(try(\$n|fromjson|.source)catch null)as\$s|[.children[]?|select($f)]|to_entries[]|
-      \"\\(.key+1))\\(if\$s!=null and.value.ussi==\$s then\" >\"else\"\"end) \\(.value.name)\"|line" --rawfile n /dev/fd/3 || :
+      \"\\(.key+1))\\(if\$s!=null and.value.ussi==\$s then\" >\"else\"\"end) \\(.value.name)\"|line" \
+      --rawfile n /dev/fd/3 || :
   else
     list inputs "$f" "$1"
   fi
@@ -176,19 +187,23 @@ setting() {
   fi
 }
 
-# Format nowplaying's @sh word list from stdin
+# Format nowplaying's @sh word list from stdin; runs in the pipeline's subshell
 show() {
-  local LC_ALL=C aFields bits=0 codec='' dur pos rate=0 tsv
+  local aFields bits=0 codec='' dur pos rate=0 rd=(-d '') tsv
+
+  # Set while the reply is on its way: C speeds up read and eval, and %g needs it.
+  # Not local: the subshell exits without restoring it.
+  LC_ALL=C
+  # read -N (Bash 4.1+) is 4x faster than -d ''
+  ((BASH_VERSINFO[0] * 100 + BASH_VERSINFO[1] < 401)) || rd=(-N 1048576)
 
   # Empty input: now reports fetch failures
-  read -r -d '' tsv || [[ -n $tsv ]] || return 0
+  read -r "${rd[@]}" tsv || [[ -n $tsv ]] || return 0
   eval "aFields=($tsv)"
 
-  # Spotify: try player API for codec, depth and bit rate on UNKNOWN codec or FLAC without bit rate
+  # UNKNOWN codec, or FLAC without bit rate
   if [[ ${aFields[3]} == UNKNOWN* || ${aFields[3]} == FLAC && ${aFields[6]} == 0 ]]; then
-    tsv=$(BASE=${BASE%:*}/api query "getData?path=player:player/data&roles=value" '.[0].trackRoles.mediaData|
-      .resources[0]?|[(.codec|strings|capture("\\((?<c>[^()]+?)(?: (?<b>[0-9]+) ?bit)?\\)$"))//{},
-      (.bitRate|int/1000)]|@sh "codec=\(.[0].c//"") bits=\(.[0].b|int) rate=\(.[1])"|line' 2>/dev/null) || tsv=
+    read -r "${rd[@]}" tsv <&3 || :
     eval "$tsv"
 
     [[ ${codec:-UNKNOWN} == UNKNOWN ]] || aFields[3]=$codec
@@ -223,7 +238,7 @@ timer() {
 usage() {
   local nm=${0##*/}
 
-  printf '%s\n' "$nm 11.1 - Control Naim Mu-so 2nd generation over HTTP
+  printf '%s\n' "$nm 11.2 - Control Naim Mu-so 2nd generation over HTTP
 Copyright (C) 2025-2026 Stouthart. All rights reserved.
 
 Usage: $nm <option> [argument]
